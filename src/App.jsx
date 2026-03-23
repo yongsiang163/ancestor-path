@@ -69,21 +69,24 @@ function BldgBtn({ id, b, selected, canAfford, locked, onClick }) {
   );
 }
 
-function TechBtn({ id, tech, done, canAfford, onResearch }) {
+function TechBtn({ id, tech, done, canAfford, locked, onResearch }) {
   const isUnlock = tech.group===TECH_GROUPS[0];
   return (
-    <button onClick={onResearch} disabled={done} style={{
+    <button onClick={onResearch} disabled={done||locked} style={{
       width:"100%", textAlign:"left", padding:"5px 7px", marginBottom:2,
       background:done?(isUnlock?"#101A08":"#0E0E18"):"#100804",
       border:`1px solid ${done?(isUnlock?"#2A5010":"#1A1A40"):"#221008"}`,
-      color:done?(isUnlock?"#4A8030":"#4A4A90"):"#C47C2A",
-      cursor:done?"default":canAfford?"pointer":"not-allowed",
-      opacity:done?0.7:canAfford?1:0.5,
+      color:done?(isUnlock?"#4A8030":"#4A4A90"):locked?"#4A3040":"#C47C2A",
+      cursor:done||locked?"not-allowed":canAfford?"pointer":"not-allowed",
+      opacity:done?0.7:locked?0.4:canAfford?1:0.5,
       transition:"all .1s", fontFamily:"'Cinzel',serif", outline:"none",
     }}>
-      <div style={{ fontSize:10, marginBottom:1 }}>{done?"✅":tech.icon} {tech.name}</div>
+      <div style={{ fontSize:10, marginBottom:1 }}>{done?"✅":locked?"🔒":tech.icon} {tech.name}</div>
       <div style={{ fontSize:8, color:done?(isUnlock?"#3A6020":"#3A3A70"):"#4A3020", lineHeight:1.5 }}>{tech.desc}</div>
-      {!done&&<div style={{ fontSize:8, color:canAfford?"#C47C2A":"#4A3018", marginTop:2 }}>🪵{tech.cw} 🪨{tech.cs}</div>}
+      {!done&&<div style={{ fontSize:8, color:canAfford?"#C47C2A":"#4A3018", marginTop:2 }}>
+        🪵{tech.cw} 🪨{tech.cs}{tech.ch > 0 && <span> 🪶{tech.ch}</span>}
+        {locked && tech.req && <span style={{ color:"#4A2040" }}> — needs {BLDG[tech.req]?.name||tech.req}</span>}
+      </div>}
     </button>
   );
 }
@@ -402,7 +405,8 @@ export default function App() {
               <PH>Research — {group.charAt(0).toUpperCase()+group.slice(1)}</PH>
               {Object.entries(TECH).filter(([,t])=>t.group===group).map(([id,tech_]) => (
                 <TechBtn key={id} id={id} tech={tech_} done={tech[id]}
-                         canAfford={res.wood>=tech_.cw&&res.stone>=tech_.cs}
+                         canAfford={res.wood>=(tech_.cw||0)&&res.stone>=(tech_.cs||0)&&res.hides>=(tech_.ch||0)}
+                         locked={!!(tech_.req&&!st.grid.some(row=>row.some(cell=>cell?.id===tech_.req)))}
                          onResearch={()=>dispatch({type:"RESEARCH",id})} />
               ))}
             </div>

@@ -93,9 +93,9 @@ export const BLDG = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  TECH TREE — 7 technologies in two groups
+//  TECH TREE — 18 technologies in five groups
 // ═══════════════════════════════════════════════════════════════════════════
-export const TECH_GROUPS = ["unlock", "mastery"];
+export const TECH_GROUPS = ["unlock", "mastery", "logistics", "ancestralMemory", "nusantaraFolklore"];
 export const TECH = {
   // group: unlock
   huntingGrounds:  { name:"Hunting Grounds",  icon:"🏹", group:"unlock",
@@ -113,6 +113,37 @@ export const TECH = {
                      desc:"-30% all construction & upgrade costs",    cw:25, cs:35 },
   animalHusbandry: { name:"Animal Husbandry",icon:"🐄", group:"mastery",
                      desc:"+2 free food/tick (no workers required)",  cw:22, cs:12 },
+  hideTanning:    { name:"Hide Tanning",     icon:"🪶", group:"mastery",
+                    desc:"+50% hides per Tanning Hut",                cw:20, cs:15, ch:10 },
+  preservation:   { name:"Preservation",    icon:"🧊", group:"mastery",
+                    desc:"+25% food cap, slows drought trigger",       cw:18, cs:10 },
+  // group: logistics (requires warehouse on grid)
+  surplusStorage: { name:"Surplus Storage", icon:"📦", group:"logistics",
+                    desc:"+40 to all storage caps",                    cw:25, cs:20, req:"warehouse" },
+  tradeRoutes:    { name:"Trade Routes",    icon:"🛤️",  group:"logistics",
+                    desc:"Unlocks wandering trader visits",            cw:35, cs:15, ch:8, req:"warehouse" },
+  stockpiling:    { name:"Stockpiling",     icon:"⚖️",  group:"logistics",
+                    desc:"Resources above 80% cap generate orichalcum trace", cw:40, cs:30, req:"warehouse" },
+  // group: ancestralMemory (requires ritualCircle on grid)
+  ancestorWorship:{ name:"Ancestor Worship",icon:"🪦", group:"ancestralMemory",
+                    desc:"+10% pop growth, unlock lore events",        cw:20, cs:25, req:"ritualCircle" },
+  riteOfSeasons:  { name:"Rite of Seasons", icon:"🌀", group:"ancestralMemory",
+                    desc:"-40% drought frequency",                     cw:30, cs:20, ch:12, req:"ritualCircle" },
+  visionQuest:    { name:"Vision Quest",    icon:"👁️",  group:"ancestralMemory",
+                    desc:"Reveals a random future event 20 ticks early", cw:25, cs:35, ch:15, req:"ritualCircle" },
+  // group: nusantaraFolklore
+  bomohArchetype: { name:"Bomoh Archetype", icon:"🔮", group:"nusantaraFolklore",
+                    desc:"+34% stability — drought + nocturnal threat resistance", cw:30, cs:25, ch:15,
+                    req:"ritualCircle",
+                    enkiLog:"LOG: System Stabiliser active. This genetic signature is invariant across all viable paths." },
+  toyolPact:      { name:"Toyol Pact",      icon:"👁️",  group:"nusantaraFolklore",
+                    desc:"+15% gather yield from depleted nodes",      cw:25, cs:20, ch:12,
+                    req:"spiritTrap",
+                    enkiLog:"LOG: Anomalous resource recovery. No evolutionary explanation. Flagged." },
+  orangBunianContact:{ name:"Orang Bunian Contact", icon:"✨", group:"nusantaraFolklore",
+                    desc:"Unlocks rare Night Market trader tier",       cw:35, cs:30, ch:20,
+                    req:"temple",
+                    enkiLog:"LOG: Cultural exchange archetype. Present only in high-complexity DNA paths." },
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -168,9 +199,11 @@ export function mkNodes() {
   return nodes;
 }
 
-export function calcCaps(grid) {
-  let food = DEFAULT_CAPS.food, wood = DEFAULT_CAPS.wood,
-      stone = DEFAULT_CAPS.stone, hides = DEFAULT_CAPS.hides;
+export function calcCaps(grid, tech = {}) {
+  let food = DEFAULT_CAPS.food + (tech.surplusStorage ? 40 : 0) + (tech.preservation ? Math.ceil(DEFAULT_CAPS.food * 0.25) : 0);
+  let wood = DEFAULT_CAPS.wood + (tech.surplusStorage ? 40 : 0);
+  let stone = DEFAULT_CAPS.stone + (tech.surplusStorage ? 40 : 0);
+  let hides = DEFAULT_CAPS.hides + (tech.surplusStorage ? 40 : 0);
   for (let r = 0; r < GH; r++) {
     for (let c = 0; c < GW; c++) {
       const cell = grid[r][c]; if (!cell) continue;
@@ -219,11 +252,12 @@ export function calcStats(st) {
   const scale     = workNeeded > 0 ? employed / workNeeded : 0;
   const dMult     = st.drought.active ? 0.5 : 1.0;
   const tMult     = st.tech.toolCrafting ? 1.25 : 1.0;
+  const hideMult  = st.tech.hideTanning ? 1.5 : 1.0;
   const passFood  = st.tech.animalHusbandry ? 2 : 0;
   const effFood   = rawFood  * scale * dMult * tMult + passFood;
   const effWood   = rawWood  * scale * tMult;
   const effStone  = rawStone * scale * tMult;
-  const hidesRate = rawHides * scale * tMult;
+  const hidesRate = rawHides * scale * tMult * hideMult;
   const consume   = st.pop * FOOD_PER_POP;
 
   return {
@@ -255,7 +289,7 @@ export function doTick(st) {
   let stone = Math.max(0, f1(res.stone + s.stoneRate));
 
   // Apply storage caps
-  const caps = calcCaps(st.grid);
+  const caps = calcCaps(st.grid, st.tech);
   food  = Math.min(food,  caps.food);
   wood  = Math.min(wood,  caps.wood);
   stone = Math.min(stone, caps.stone);
@@ -264,7 +298,8 @@ export function doTick(st) {
   // Drought
   let da = drought.active, dt = drought.ticks, famine = false;
   if (da) { dt--; if (dt <= 0) { da=false; dt=0; famine=true; L=logPush(L,"☀️ Drought breaks… famine follows."); } }
-  if (!da && food < DROUGHT_FOOD) { da=true; dt=DROUGHT_LEN; L=logPush(L,`🌵 DROUGHT! Food halved for ${DROUGHT_LEN} ticks!`); }
+  const droughtThreshold = st.tech.preservation ? Math.floor(DROUGHT_FOOD * 0.6) : DROUGHT_FOOD;
+  if (!da && food < droughtThreshold) { da=true; dt=DROUGHT_LEN; L=logPush(L,`🌵 DROUGHT! Food halved for ${DROUGHT_LEN} ticks!`); }
 
   // Population
   let p = pop;
@@ -278,6 +313,16 @@ export function doTick(st) {
   if (stone>100&&res.stone<=100) L=logPush(L,"🪨 Stone reserves grow immense!");
 
   return { ...st, res:{food,wood,stone,hides}, pop:p, log:L, nodes, drought:{active:da,ticks:dt}, tick:t+1 };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  HELPERS (game-logic internal)
+// ═══════════════════════════════════════════════════════════════════════════
+function gridHasBuilding(grid, id) {
+  for (let r = 0; r < GH; r++)
+    for (let c = 0; c < GW; c++)
+      if (grid[r][c]?.id === id) return true;
+  return false;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -362,12 +407,24 @@ export function reducer(st, a) {
     case "SPEED":    return { ...st, speed: a.v };
 
     case "RESEARCH": {
-      const tech=TECH[a.id]; if (!tech||st.tech[a.id]) return st;
-      if (st.res.wood<tech.cw||st.res.stone<tech.cs)
-        return {...st,log:logPush(st.log,`❌ Need 🪵${tech.cw} 🪨${tech.cs} for ${tech.name}`)};
-      return {...st,tech:{...st.tech,[a.id]:true},
-              res:{...st.res,wood:st.res.wood-tech.cw,stone:st.res.stone-tech.cs},
-              log:logPush(st.log,`🔬 ${tech.name} discovered!`)};
+      const tech = TECH[a.id]; if (!tech || st.tech[a.id]) return st;
+      if (tech.req && !gridHasBuilding(st.grid, tech.req))
+        return { ...st, log: logPush(st.log, `🔒 ${tech.name} requires ${BLDG[tech.req]?.name || tech.req}`) };
+      const disc = st.tech.stoneMasonry ? 0.7 : 1.0;
+      const cw = Math.ceil((tech.cw || 0) * disc);
+      const cs = Math.ceil((tech.cs || 0) * disc);
+      const ch = tech.ch || 0;
+      if (st.res.wood < cw || st.res.stone < cs || st.res.hides < ch)
+        return { ...st, log: logPush(st.log, `❌ Need 🪵${cw} 🪨${cs}${ch ? ` 🪶${ch}` : ""} for ${tech.name}`) };
+      const msg = tech.enkiLog
+        ? `🔬 ${tech.name} decoded. ${tech.enkiLog}`
+        : `🔬 ${tech.name} — ancestral pathway recovered.`;
+      return {
+        ...st,
+        tech: { ...st.tech, [a.id]: true },
+        res: { ...st.res, wood: st.res.wood - cw, stone: st.res.stone - cs, hides: st.res.hides - ch },
+        log: logPush(st.log, msg),
+      };
     }
 
     case "NEW_GAME": return initState();
