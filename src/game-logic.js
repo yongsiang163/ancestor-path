@@ -318,7 +318,7 @@ export function doTick(st) {
 // ═══════════════════════════════════════════════════════════════════════════
 //  HELPERS (game-logic internal)
 // ═══════════════════════════════════════════════════════════════════════════
-function gridHasBuilding(grid, id) {
+export function gridHasBuilding(grid, id) {
   for (let r = 0; r < GH; r++)
     for (let c = 0; c < GW; c++)
       if (grid[r][c]?.id === id) return true;

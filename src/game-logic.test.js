@@ -134,6 +134,15 @@ describe('tech tree', () => {
     expect(next.res.hides).toBeGreaterThanOrEqual(0);
   });
 
+  it('surplusStorage tech adds 40 to all caps', () => {
+    const st = initState();
+    const caps = calcCaps(st.grid, { surplusStorage: true });
+    expect(caps.food).toBe(DEFAULT_CAPS.food + 40);
+    expect(caps.wood).toBe(DEFAULT_CAPS.wood + 40);
+    expect(caps.stone).toBe(DEFAULT_CAPS.stone + 40);
+    expect(caps.hides).toBe(DEFAULT_CAPS.hides + 40);
+  });
+
   it('RESEARCH blocks if building prerequisite not met', () => {
     const st = initState();
     const next = reducer(st, { type:'RESEARCH', id:'ancestorWorship' });
