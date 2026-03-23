@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { initState, doTick, calcStats, DEFAULT_CAPS, calcCaps, reducer, BLDG, TECH_GROUPS, TECH, ROLES, BLDG_ROLE, THREAT_DEF } from './game-logic.js';
+import { initState, doTick, calcStats, DEFAULT_CAPS, calcCaps, reducer, BLDG, TECH_GROUPS, TECH, ROLES, BLDG_ROLE, THREAT_DEF, calcGenomicCoverage } from './game-logic.js';
 
 describe('initState', () => {
   it('starts with 4 pop and correct resources', () => {
@@ -235,5 +235,31 @@ describe('nocturnal threats', () => {
     };
     const next = doTick(threatened);
     expect(next.res.food + next.res.wood).toBeGreaterThanOrEqual(100);
+  });
+});
+
+describe('genomic coverage', () => {
+  it('starts above 0 with starter buildings', () => {
+    const st = initState();
+    expect(calcGenomicCoverage(st)).toBeGreaterThan(0);
+  });
+
+  it('increases when a tech is researched', () => {
+    const st1 = initState();
+    const st2 = { ...st1, tech: { ...st1.tech, toolCrafting: true } };
+    expect(calcGenomicCoverage(st2)).toBeGreaterThan(calcGenomicCoverage(st1));
+  });
+
+  it('never exceeds 100', () => {
+    const st = initState();
+    expect(calcGenomicCoverage(st)).toBeLessThanOrEqual(100);
+  });
+
+  it('increases when more buildings are placed', () => {
+    const st = initState();
+    const grid = st.grid.map(r => [...r]);
+    grid[5][5] = { id: 'quarry', level: 1 };
+    const st2 = { ...st, grid };
+    expect(calcGenomicCoverage(st2)).toBeGreaterThan(calcGenomicCoverage(st));
   });
 });

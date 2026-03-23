@@ -1,5 +1,5 @@
 import { useState, useEffect, useReducer, useRef, useCallback } from "react";
-import { GW, GH, MAX_LVL, TICK_MS, DAY_MS, DROUGHT_FOOD, TILE_PX, LV_MULT, LV_XWORK, LV_ROM, NODE_DEF, BLDG, TECH_GROUPS, TECH, ROLES, f1, sign, nodeKey, upgCost, bldgWorkers, bldgRate, bldgHousing, calcStats, reducer, initState, calcDayNight, THREAT_DEF } from './game-logic.js';
+import { GW, GH, MAX_LVL, TICK_MS, DAY_MS, DROUGHT_FOOD, TILE_PX, LV_MULT, LV_XWORK, LV_ROM, NODE_DEF, BLDG, TECH_GROUPS, TECH, ROLES, f1, sign, nodeKey, upgCost, bldgWorkers, bldgRate, bldgHousing, calcStats, reducer, initState, calcDayNight, THREAT_DEF, calcGenomicCoverage } from './game-logic.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  SUB-COMPONENTS
@@ -195,6 +195,46 @@ const tribeBtnStyle = {
   padding: 0, outline: "none",
 };
 
+function CoverageMeter({ coverage }) {
+  const pct = Math.min(100, coverage);
+  const barColor = pct >= 100 ? "#72E472" : pct >= 60 ? "#C4A020" : "#C47C2A";
+  return (
+    <div style={{ marginBottom:7, padding:"6px 9px",
+                  background:"rgba(0,0,0,0.28)", border:"1px solid #1E1008" }}>
+      <div style={{ display:"flex", justifyContent:"space-between",
+                    fontSize:8.5, marginBottom:4, letterSpacing:"0.08em" }}>
+        <span style={{ color:"#4A3020", fontFamily:"'Courier New',monospace" }}>
+          ENKI-PROTOCOL // TIER 1 GENOMIC COVERAGE
+        </span>
+        <span style={{ color: barColor, fontFamily:"'Courier New',monospace" }}>
+          {pct}%
+        </span>
+      </div>
+      <div style={{ height:4, background:"#1A0E04", borderRadius:2, overflow:"hidden" }}>
+        <div style={{
+          height:"100%", width:`${pct}%`,
+          background: barColor,
+          borderRadius:2,
+          transition:"width 0.4s ease",
+          boxShadow: pct >= 100 ? `0 0 6px ${barColor}` : "none",
+        }} />
+      </div>
+      {pct >= 100 && (
+        <div style={{ fontSize:8.5, color:"#72E472", marginTop:4,
+                      fontFamily:"'Courier New',monospace", letterSpacing:"0.05em" }}>
+          ✦ TIER 1 COMPLETE — SUMERIAN UPLIFT APPROACHING
+        </div>
+      )}
+      {pct >= 60 && pct < 100 && (
+        <div style={{ fontSize:8.5, color:"#9A7020", marginTop:4,
+                      fontFamily:"'Crimson Text',serif", fontStyle:"italic" }}>
+          Night Market unlocking…
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 //  MAIN APP
 // ═══════════════════════════════════════════════════════════════════════════
@@ -222,8 +262,9 @@ export default function App() {
     return () => cancelAnimationFrame(rafRef.current);
   }, []);
 
-  const sky   = calcDayNight(phase);
-  const stats = calcStats(st);
+  const sky      = calcDayNight(phase);
+  const stats    = calcStats(st);
+  const coverage = calcGenomicCoverage(st);
   const { res, pop, sel, paused, speed, log, drought, tick, tech, nodes, roles, markers } = st;
   const selBldg = BLDG[sel];
 
@@ -681,6 +722,9 @@ export default function App() {
               )}
             </div>
           )}
+
+          {/* Genomic Coverage */}
+          <CoverageMeter coverage={coverage} />
 
           {/* Tribe Panel */}
           <TribePanel

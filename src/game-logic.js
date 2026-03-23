@@ -605,6 +605,35 @@ export function initState() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+//  GENOMIC COVERAGE
+// ═══════════════════════════════════════════════════════════════════════════
+export function calcGenomicCoverage(st) {
+  // Points system — normalised to 100
+  // Buildings: 3pts each (max ~16 buildings * 3 = 48)
+  // Techs: 5pts each, folklore techs 8pts each (max 15*5 + 3*8 = 99)
+  // Genetic markers: 2pts per unit (slow accumulation)
+  // Total possible ~150+ — normalise to 100 with /1.5 divisor
+
+  let pts = 0;
+
+  // Buildings on grid
+  for (let r = 0; r < GH; r++)
+    for (let c = 0; c < GW; c++)
+      if (st.grid[r][c]) pts += 3;
+
+  // Techs researched
+  Object.entries(TECH).forEach(([k, def]) => {
+    if (st.tech[k]) pts += def.group === 'nusantaraFolklore' ? 8 : 5;
+  });
+
+  // Genetic markers
+  const m = st.markers || {};
+  pts += ((m.combatReflex || 0) + (m.orichalcumTuning || 0) + (m.systemCoherence || 0)) * 2;
+
+  return Math.min(100, Math.round((pts / 150) * 100));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 //  DAY / NIGHT
 // ═══════════════════════════════════════════════════════════════════════════
 export function calcDayNight(phase) {
