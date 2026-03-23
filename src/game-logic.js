@@ -164,6 +164,36 @@ export const TECH = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
+//  NOCTURNAL THREAT DEFINITIONS
+// ═══════════════════════════════════════════════════════════════════════════
+export const THREAT_DEF = {
+  toyol: {
+    icon: "👁️", name: "Toyol",
+    spawnChance: 0.004, // per tick at night
+    stealRate: { food: 2, wood: 2 },
+    duration: 8,
+    counter: "spiritTrap",
+    enkiLog: "LOG: Bio-drone remnant detected. Anunnaki resource audit protocol active.",
+  },
+  orangMinyak: {
+    icon: "🫥", name: "Orang Minyak",
+    spawnChance: 0.002,
+    tileBlock: true,
+    duration: 20,
+    counter: "temple",
+    enkiLog: "LOG: Unstable genetic template detected. Prototype still active on legacy code.",
+  },
+  whisperStorm: {
+    icon: "🌀", name: "Whisper Storm",
+    spawnChance: 0.001,
+    efficiencyDrain: 0.5,
+    duration: 1, // lasts 1 tick, sets whisperActive for next tick
+    counter: "shaman", // any shaman-staffed building present
+    enkiLog: "LOG: Anunnaki Memory Pulse detected. Ancestral trauma broadcasting from genome.",
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
 //  HELPERS
 // ═══════════════════════════════════════════════════════════════════════════
 export const f1      = n => (isNaN(n)||!isFinite(n)) ? 0 : Math.round(n * 10) / 10;
@@ -303,10 +333,12 @@ export function calcStats(st) {
   const hidesRate  = rawHides * tMult * hideMult;
   const consume    = st.pop * FOOD_PER_POP;
 
+  const wMult = st.whisperActive ? 0.5 : 1.0;
+
   return {
     housing, workNeeded, employed, scale,
-    foodProd: effFood, woodRate: effWood, stoneRate: effStone, hidesRate,
-    consume, netFood: effFood - consume, passFood,
+    foodProd: effFood * wMult, woodRate: effWood * wMult, stoneRate: effStone * wMult, hidesRate: hidesRate * wMult,
+    consume, netFood: effFood * wMult - consume, passFood,
     bldgBreakdown, rawFood, rawWood, rawStone,
   };
 }
@@ -330,6 +362,44 @@ export function doTick(st) {
   let food  = Math.max(0, f1(res.food  + s.netFood));
   let wood  = Math.max(0, f1(res.wood  + s.woodRate));
   let stone = Math.max(0, f1(res.stone + s.stoneRate));
+
+  // ── Day phase ────────────────────────────────────────────────────────────
+  const dayPhase = (t * TICK_MS / DAY_MS) % 1;
+  const isNight  = dayPhase < 0.25 || dayPhase > 0.75;
+
+  // ── Tick down and expire threats ─────────────────────────────────────────
+  let threats = (st.threats || [])
+    .map(th => ({ ...th, ticks: th.ticks - 1 }))
+    .filter(th => th.ticks > 0);
+
+  // ── Toyol: steal resources ────────────────────────────────────────────────
+  const hasToyol      = threats.some(th => th.type === 'toyol');
+  const hasSpiritTrap = gridHasBuilding(st.grid, 'spiritTrap');
+  // Bomoh tech halves all threat chances
+  const bomohActive   = st.tech.bomohArchetype || false;
+
+  if (hasToyol && !hasSpiritTrap && !bomohActive) {
+    food = Math.max(0, food - THREAT_DEF.toyol.stealRate.food);
+    wood = Math.max(0, wood - THREAT_DEF.toyol.stealRate.wood);
+  }
+
+  // ── Whisper Storm: set flag for next tick ─────────────────────────────────
+  const hasWhisper    = threats.some(th => th.type === 'whisperStorm');
+  const hasShamanBldg = gridHasBuilding(st.grid, 'spiritTrap') ||
+                        gridHasBuilding(st.grid, 'ritualCircle') ||
+                        gridHasBuilding(st.grid, 'temple');
+  const whisperActive = hasWhisper && !hasShamanBldg && !bomohActive;
+
+  // ── Spawn new threats (night only) ────────────────────────────────────────
+  if (isNight) {
+    Object.entries(THREAT_DEF).forEach(([type, def]) => {
+      const alreadyActive = threats.some(th => th.type === type);
+      if (!alreadyActive && Math.random() < (bomohActive ? def.spawnChance * 0.5 : def.spawnChance)) {
+        threats.push({ type, ticks: def.duration });
+        L = logPush(L, `${def.icon} ${def.name} approaches! ${def.enkiLog}`);
+      }
+    });
+  }
 
   // Apply storage caps
   const caps = calcCaps(st.grid, st.tech);
@@ -369,7 +439,9 @@ export function doTick(st) {
     };
   }
 
-  return { ...st, res:{food,wood,stone,hides}, pop:p, log:L, nodes, drought:{active:da,ticks:dt}, tick:t+1, markers };
+  return { ...st, res:{food,wood,stone,hides}, pop:p, log:L, nodes,
+           drought:{active:da,ticks:dt}, tick:t+1,
+           threats, whisperActive, dayPhase, markers };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -526,6 +598,9 @@ export function initState() {
     tick:0, paused:false, speed:1, sel:"hut",
     roles:   { gatherer: 2, woodcutter: 1, mason: 1, hunter: 0, shaman: 0 },
     markers: { combatReflex: 0, orichalcumTuning: 0, systemCoherence: 0 },
+    threats: [],           // [{ type: string, ticks: number }]
+    whisperActive: false,  // true = efficiency halved this tick (from whisperStorm last tick)
+    dayPhase: 0.5,         // 0=midnight, 0.5=noon, drives isNight check
   };
 }
 

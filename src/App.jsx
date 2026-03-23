@@ -1,5 +1,5 @@
 import { useState, useEffect, useReducer, useRef, useCallback } from "react";
-import { GW, GH, MAX_LVL, TICK_MS, DAY_MS, DROUGHT_FOOD, TILE_PX, LV_MULT, LV_XWORK, LV_ROM, NODE_DEF, BLDG, TECH_GROUPS, TECH, ROLES, f1, sign, nodeKey, upgCost, bldgWorkers, bldgRate, bldgHousing, calcStats, reducer, initState, calcDayNight } from './game-logic.js';
+import { GW, GH, MAX_LVL, TICK_MS, DAY_MS, DROUGHT_FOOD, TILE_PX, LV_MULT, LV_XWORK, LV_ROM, NODE_DEF, BLDG, TECH_GROUPS, TECH, ROLES, f1, sign, nodeKey, upgCost, bldgWorkers, bldgRate, bldgHousing, calcStats, reducer, initState, calcDayNight, THREAT_DEF } from './game-logic.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  SUB-COMPONENTS
@@ -386,6 +386,23 @@ export default function App() {
         <Stat icon="🪨" label="Stone" value={f1(res.stone)} rate={stats.stoneRate} />
         <Stat icon="🪶" label="Hides" value={f1(res.hides)} rate={stats.hidesRate} />
       </div>
+
+      {/* Threat indicator */}
+      {st.threats && st.threats.length > 0 && (
+        <div style={{
+          padding:"4px 10px", marginBottom:4,
+          background:"rgba(80,0,0,0.4)", border:"1px solid #5A1010",
+          fontSize:10, color:"#E47272", fontFamily:"'Cinzel',serif",
+          display:"flex", gap:12, flexWrap:"wrap",
+        }}>
+          {st.threats.map((th, i) => (
+            <span key={i}>
+              {THREAT_DEF[th.type].icon} {THREAT_DEF[th.type].name} ({th.ticks}t)
+            </span>
+          ))}
+          {st.whisperActive && <span style={{ color:"#C870D8" }}>🌀 Whisper active — efficiency halved</span>}
+        </div>
+      )}
 
       {/* ── BODY ───────────────────────────────────────────────────────────── */}
       <div style={{ display:"flex", gap:7, alignItems:"flex-start" }}>

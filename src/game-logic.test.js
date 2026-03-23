@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { initState, doTick, calcStats, DEFAULT_CAPS, calcCaps, reducer, BLDG, TECH_GROUPS, TECH, ROLES, BLDG_ROLE } from './game-logic.js';
+import { initState, doTick, calcStats, DEFAULT_CAPS, calcCaps, reducer, BLDG, TECH_GROUPS, TECH, ROLES, BLDG_ROLE, THREAT_DEF } from './game-logic.js';
 
 describe('initState', () => {
   it('starts with 4 pop and correct resources', () => {
@@ -195,5 +195,45 @@ describe('population roles', () => {
     // Run 10 ticks
     for (let i = 0; i < 10; i++) st = { ...doTick(st), tick: st.tick + 1 };
     expect(st.markers.combatReflex).toBeGreaterThan(0);
+  });
+});
+
+describe('nocturnal threats', () => {
+  it('THREAT_DEF exports 3 threat types', () => {
+    expect(THREAT_DEF).toHaveProperty('toyol');
+    expect(THREAT_DEF).toHaveProperty('orangMinyak');
+    expect(THREAT_DEF).toHaveProperty('whisperStorm');
+  });
+
+  it('initState has empty threats array and whisperActive false', () => {
+    const st = initState();
+    expect(st.threats).toEqual([]);
+    expect(st.whisperActive).toBe(false);
+  });
+
+  it('toyol steals resources when active and no spiritTrap on grid', () => {
+    const st = {
+      ...initState(),
+      res: { food: 50, wood: 50, stone: 50, hides: 10 },
+      threats: [{ type: 'toyol', ticks: 5 }],
+      whisperActive: false,
+    };
+    const next = doTick(st);
+    // Resources should decrease (toyol steals)
+    expect(next.res.food + next.res.wood).toBeLessThan(100);
+  });
+
+  it('spiritTrap neutralises toyol steal', () => {
+    const st = initState();
+    const grid = st.grid.map(r => [...r]);
+    grid[5][5] = { id: 'spiritTrap', level: 1 };
+    const threatened = {
+      ...st, grid,
+      res: { food: 50, wood: 50, stone: 50, hides: 10 },
+      threats: [{ type: 'toyol', ticks: 5 }],
+      whisperActive: false,
+    };
+    const next = doTick(threatened);
+    expect(next.res.food + next.res.wood).toBeGreaterThanOrEqual(100);
   });
 });
