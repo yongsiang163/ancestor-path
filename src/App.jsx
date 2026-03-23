@@ -1,5 +1,5 @@
 import { useState, useEffect, useReducer, useRef, useCallback } from "react";
-import { GW, GH, MAX_LVL, TICK_MS, DAY_MS, DROUGHT_FOOD, TILE_PX, LV_MULT, LV_XWORK, LV_ROM, NODE_DEF, BLDG, TECH_GROUPS, TECH, ROLES, f1, sign, nodeKey, upgCost, bldgWorkers, bldgRate, bldgHousing, calcStats, reducer, initState, calcDayNight, THREAT_DEF, calcGenomicCoverage } from './game-logic.js';
+import { GW, GH, MAX_LVL, TICK_MS, DAY_MS, DROUGHT_FOOD, TILE_PX, LV_MULT, LV_XWORK, LV_ROM, NODE_DEF, BLDG, TECH_GROUPS, TECH, ROLES, f1, sign, nodeKey, upgCost, bldgWorkers, bldgRate, bldgHousing, calcStats, reducer, initState, calcDayNight, THREAT_DEF, calcGenomicCoverage, calcCaps } from './game-logic.js';
 
 // Resource metadata used by Night Market UI
 const RES_META = [
@@ -273,6 +273,7 @@ export default function App() {
   const sky      = calcDayNight(phase);
   const stats    = calcStats(st);
   const coverage = calcGenomicCoverage(st);
+  const caps     = calcCaps(st.grid, st.tech);
   const { res, pop, sel, paused, speed, log, drought, tick, tech, nodes, roles, markers } = st;
   const selBldg = BLDG[sel];
 
@@ -428,12 +429,12 @@ export default function App() {
         <Stat icon="👥" label="Population" value={`${pop} / ${stats.housing}`}
               sub={`${pop-stats.employed} idle · ${stats.employed} working`}
               alert={pop>=stats.housing} />
-        <Stat icon="🍖" label="Food" value={f1(res.food)} rate={stats.netFood}
+        <Stat icon="🍖" label="Food" value={`${f1(res.food)}/${caps.food}`} rate={stats.netFood}
               sub={`+${f1(stats.foodProd)} prod · −${f1(stats.consume)} eat`}
               alert={res.food<DROUGHT_FOOD} />
-        <Stat icon="🪵" label="Wood"  value={f1(res.wood)}  rate={stats.woodRate}  />
-        <Stat icon="🪨" label="Stone" value={f1(res.stone)} rate={stats.stoneRate} />
-        <Stat icon="🪶" label="Hides" value={f1(res.hides)} rate={stats.hidesRate} />
+        <Stat icon="🪵" label="Wood"  value={`${f1(res.wood)}/${caps.wood}`}   rate={stats.woodRate}  />
+        <Stat icon="🪨" label="Stone" value={`${f1(res.stone)}/${caps.stone}`} rate={stats.stoneRate} />
+        <Stat icon="🪶" label="Hides" value={`${f1(res.hides)}/${caps.hides}`} rate={stats.hidesRate} />
       </div>
 
       {/* Threat indicator */}
@@ -801,6 +802,7 @@ export default function App() {
               ["🍖 Food",  `${sign(stats.netFood)}/t  (+${f1(stats.foodProd)} −${f1(stats.consume)})`],
               ["🪵 Wood",  `${sign(stats.woodRate)}/t`],
               ["🪨 Stone", `${sign(stats.stoneRate)}/t`],
+              ["🪶 Hides", `${sign(stats.hidesRate)}/t`],
               ["👷 Work",  `${stats.employed}/${stats.workNeeded} workers (${Math.round(stats.scale*100)}%)`],
               ["🏠 Cap",   `${pop}/${stats.housing} housing`],
             ].map(([k,v])=>(
