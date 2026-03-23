@@ -1,5 +1,5 @@
 import { useState, useEffect, useReducer, useRef, useCallback } from "react";
-import { GW, GH, MAX_LVL, TICK_MS, DAY_MS, DROUGHT_FOOD, TILE_PX, LV_MULT, LV_XWORK, LV_ROM, NODE_DEF, BLDG, TECH_GROUPS, TECH, f1, sign, nodeKey, upgCost, bldgWorkers, bldgRate, bldgHousing, calcStats, reducer, initState, calcDayNight } from './game-logic.js';
+import { GW, GH, MAX_LVL, TICK_MS, DAY_MS, DROUGHT_FOOD, TILE_PX, LV_MULT, LV_XWORK, LV_ROM, NODE_DEF, BLDG, TECH_GROUPS, TECH, ROLES, f1, sign, nodeKey, upgCost, bldgWorkers, bldgRate, bldgHousing, calcStats, reducer, initState, calcDayNight } from './game-logic.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  SUB-COMPONENTS
@@ -131,6 +131,70 @@ function BldgRow({ id, bd, scale, masonry }) {
   );
 }
 
+function TribePanel({ roles, pop, markers, dispatch }) {
+  const totalAssigned = Object.values(roles).reduce((a, b) => a + b, 0);
+  const idle = pop - totalAssigned;
+
+  return (
+    <div style={{ marginBottom:7, padding:"7px 9px",
+                  background:"rgba(0,0,0,0.28)", border:"1px solid #1E1008" }}>
+      <PH>Tribe · {pop} Settlers</PH>
+
+      {Object.entries(ROLES).map(([key, def]) => (
+        <div key={key} style={{ display:"flex", alignItems:"center",
+                                 justifyContent:"space-between", marginBottom:3 }}>
+          <span style={{ fontSize:10, color:"#C47C2A", minWidth:90 }}>
+            {def.icon} {def.name}
+          </span>
+          <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+            <button
+              onClick={() => dispatch({ type:"SET_ROLE", role:key, delta:-1 })}
+              style={tribeBtnStyle}
+            >−</button>
+            <span style={{ fontSize:11, color:"#F0A850", width:16, textAlign:"center" }}>
+              {roles[key] || 0}
+            </span>
+            <button
+              onClick={() => dispatch({ type:"SET_ROLE", role:key, delta:+1 })}
+              style={tribeBtnStyle}
+            >+</button>
+          </div>
+        </div>
+      ))}
+
+      {idle > 0 && (
+        <div style={{ fontSize:9, color:"#7A5030", marginTop:3,
+                      fontFamily:"'Crimson Text',serif", fontStyle:"italic" }}>
+          ⚠ {idle} idle — assign to roles for full output
+        </div>
+      )}
+
+      {/* Genetic markers */}
+      <div style={{ marginTop:6, paddingTop:4, borderTop:"1px solid #1A0E04",
+                    display:"flex", gap:10, fontSize:9 }}>
+        <span title="Combat Reflex — hunter specialisation" style={{ color:"#C87060" }}>
+          ⚔️ {markers.combatReflex}
+        </span>
+        <span title="Orichalcum Tuning — builder/scholar specialisation" style={{ color:"#60A0C8" }}>
+          💎 {markers.orichalcumTuning}
+        </span>
+        <span title="System Coherence — shaman/folklore specialisation" style={{ color:"#9070D0" }}>
+          🔮 {markers.systemCoherence}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+const tribeBtnStyle = {
+  width: 16, height: 16,
+  background: "#1A0E04", border: "1px solid #3A2010",
+  color: "#C47C2A", cursor: "pointer",
+  fontSize: 10, lineHeight: 1,
+  display: "flex", alignItems: "center", justifyContent: "center",
+  padding: 0, outline: "none",
+};
+
 // ═══════════════════════════════════════════════════════════════════════════
 //  MAIN APP
 // ═══════════════════════════════════════════════════════════════════════════
@@ -160,7 +224,7 @@ export default function App() {
 
   const sky   = calcDayNight(phase);
   const stats = calcStats(st);
-  const { res, pop, sel, paused, speed, log, drought, tick, tech, nodes } = st;
+  const { res, pop, sel, paused, speed, log, drought, tick, tech, nodes, roles, markers } = st;
   const selBldg = BLDG[sel];
 
   const spawnFloat = useCallback((r, c, text, color="#72E472") => {
@@ -600,6 +664,14 @@ export default function App() {
               )}
             </div>
           )}
+
+          {/* Tribe Panel */}
+          <TribePanel
+            roles={roles}
+            pop={pop}
+            markers={markers}
+            dispatch={dispatch}
+          />
 
           {/* Buildings breakdown */}
           {Object.keys(stats.bldgBreakdown).length > 0 && (
