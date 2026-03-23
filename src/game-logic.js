@@ -7,6 +7,7 @@
 //  CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════════
 export const GW = 20, GH = 13, MAX_LVL = 3, BASE_HOUSING = 4;
+export const DEFAULT_CAPS = { food: 80, wood: 100, stone: 100, hides: 40 };
 export const TICK_MS = 1300, DAY_MS = 480_000, MAX_LOG = 20;
 export const DROUGHT_FOOD = 10, DROUGHT_LEN = 15, FOOD_PER_POP = 0.25;
 export const TILE_PX = 34;
@@ -14,6 +15,23 @@ export const TILE_PX = 34;
 export const LV_MULT  = [1.0, 1.65, 2.6];
 export const LV_XWORK = [0,   1,    2  ];   // bonus workers added per level
 export const LV_ROM   = ["Ⅰ","Ⅱ","Ⅲ"];
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  POPULATION ROLES
+// ═══════════════════════════════════════════════════════════════════════════
+export const ROLES = {
+  gatherer:  { name:"Gatherer",   icon:"🧺", works:["bonfire","berryFarm","fishery","herbGarden"], bonus:"food",  mult:1.10 },
+  woodcutter:{ name:"Woodcutter", icon:"🪓", works:["woodCamp","forester"],                        bonus:"wood",  mult:1.10 },
+  mason:     { name:"Mason",      icon:"⛏️",  works:["quarry","granary","warehouse"],               bonus:"stone", mult:1.10 },
+  hunter:    { name:"Hunter",     icon:"🏹", works:["hunt","tanningHut"],                          bonus:"food",  mult:1.15 },
+  shaman:    { name:"Shaman",     icon:"🔮", works:["ritualCircle","eldersLodge","spiritTrap","temple"], bonus:null, mult:1.0 },
+};
+
+// Reverse lookup: building id → preferred role key
+export const BLDG_ROLE = Object.entries(ROLES).reduce((acc, [role, def]) => {
+  def.works.forEach(bId => { acc[bId] = role; });
+  return acc;
+}, {});
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  NATURAL RESOURCE NODES
@@ -65,12 +83,36 @@ export const BLDG = {
                housing:0, workers:3, food:3, wood:0, stone:0, cw:15, cs:10, tech:"netFishing"     },
   berryFarm: { name:"Berry Farm",  icon:"🫐", bg:"#1A0828", border:"#502870",
                housing:0, workers:1, food:2, wood:0, stone:0, cw:8,  cs:5,  tech:"irrigation"     },
+  granary:     { name:"Granary",        icon:"🏚️", bg:"#2A1A0A", border:"#5A3A18",
+               housing:0, housingPerLevel:0, workers:2, food:0, wood:0, stone:0, hides:0,
+               cw:12, cs:8  },
+  warehouse:   { name:"Warehouse",      icon:"📦", bg:"#1A1A0A", border:"#4A4A20",
+               housing:0, housingPerLevel:0, workers:2, food:0, wood:0, stone:0, hides:0,
+               cw:15, cs:10 },
+  ritualCircle:{ name:"Ritual Circle",  icon:"🔵", bg:"#0A0A2A", border:"#2A2A70",
+               housing:0, housingPerLevel:0, workers:0, food:0, wood:0, stone:0, hides:0,
+               cw:15, cs:20, unlocksBranch:"ancestralMemory" },
+  tanningHut:  { name:"Tanning Hut",    icon:"🪶", bg:"#1A0E08", border:"#4A2A10",
+               housing:0, housingPerLevel:0, workers:2, food:0, wood:0, stone:0, hides:1,
+               cw:10, cs:6  },
+  herbGarden:  { name:"Herb Garden",    icon:"🌿", bg:"#061A06", border:"#1A5020",
+               housing:0, housingPerLevel:0, workers:1, food:0, wood:0, stone:0, hides:0,
+               cw:8,  cs:5,  growthBonus:0.5 },
+  spiritTrap:  { name:"Spirit Trap",    icon:"🕸️", bg:"#1A0A1A", border:"#4A1A4A",
+               housing:0, housingPerLevel:0, workers:1, food:0, wood:0, stone:0, hides:0,
+               cw:12, cs:8,  counters:"toyol" },
+  temple:      { name:"Temple",         icon:"🏯", bg:"#1A1208", border:"#504020",
+               housing:0, housingPerLevel:0, workers:2, food:0, wood:0, stone:0, hides:0,
+               cw:20, cs:15, counters:"orangMinyak" },
+  eldersLodge: { name:"Elder's Lodge",  icon:"🏛️", bg:"#120808", border:"#402020",
+               housing:0, housingPerLevel:0, workers:3, food:0, wood:0, stone:0, hides:0,
+               cw:20, cs:15, extraResearchSlot:true },
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  TECH TREE — 7 technologies in two groups
+//  TECH TREE — 18 technologies in five groups
 // ═══════════════════════════════════════════════════════════════════════════
-export const TECH_GROUPS = ["unlock", "mastery"];
+export const TECH_GROUPS = ["unlock", "mastery", "logistics", "ancestralMemory", "nusantaraFolklore"];
 export const TECH = {
   // group: unlock
   huntingGrounds:  { name:"Hunting Grounds",  icon:"🏹", group:"unlock",
@@ -88,7 +130,97 @@ export const TECH = {
                      desc:"-30% all construction & upgrade costs",    cw:25, cs:35 },
   animalHusbandry: { name:"Animal Husbandry",icon:"🐄", group:"mastery",
                      desc:"+2 free food/tick (no workers required)",  cw:22, cs:12 },
+  hideTanning:    { name:"Hide Tanning",     icon:"🪶", group:"mastery",
+                    desc:"+50% hides per Tanning Hut",                cw:20, cs:15, ch:10 },
+  preservation:   { name:"Preservation",    icon:"🧊", group:"mastery",
+                    desc:"+25% food cap, slows drought trigger",       cw:18, cs:10 },
+  // group: logistics (requires warehouse on grid)
+  surplusStorage: { name:"Surplus Storage", icon:"📦", group:"logistics",
+                    desc:"+40 to all storage caps",                    cw:25, cs:20, req:"warehouse" },
+  tradeRoutes:    { name:"Trade Routes",    icon:"🛤️",  group:"logistics",
+                    desc:"Unlocks wandering trader visits",            cw:35, cs:15, ch:8, req:"warehouse" },
+  stockpiling:    { name:"Stockpiling",     icon:"⚖️",  group:"logistics",
+                    desc:"Resources above 80% cap generate orichalcum trace", cw:40, cs:30, req:"warehouse" },
+  // group: ancestralMemory (requires ritualCircle on grid)
+  ancestorWorship:{ name:"Ancestor Worship",icon:"🪦", group:"ancestralMemory",
+                    desc:"+10% pop growth, unlock lore events",        cw:20, cs:25, req:"ritualCircle" },
+  riteOfSeasons:  { name:"Rite of Seasons", icon:"🌀", group:"ancestralMemory",
+                    desc:"-40% drought frequency",                     cw:30, cs:20, ch:12, req:"ritualCircle" },
+  visionQuest:    { name:"Vision Quest",    icon:"👁️",  group:"ancestralMemory",
+                    desc:"Reveals a random future event 20 ticks early", cw:25, cs:35, ch:15, req:"ritualCircle" },
+  // group: nusantaraFolklore
+  bomohArchetype: { name:"Bomoh Archetype", icon:"🔮", group:"nusantaraFolklore",
+                    desc:"+34% stability — drought + nocturnal threat resistance", cw:30, cs:25, ch:15,
+                    req:"ritualCircle",
+                    enkiLog:"LOG: System Stabiliser active. This genetic signature is invariant across all viable paths." },
+  toyolPact:      { name:"Toyol Pact",      icon:"👁️",  group:"nusantaraFolklore",
+                    desc:"+15% gather yield from depleted nodes",      cw:25, cs:20, ch:12,
+                    req:"spiritTrap",
+                    enkiLog:"LOG: Anomalous resource recovery. No evolutionary explanation. Flagged." },
+  orangBunianContact:{ name:"Orang Bunian Contact", icon:"✨", group:"nusantaraFolklore",
+                    desc:"Unlocks rare Night Market trader tier",       cw:35, cs:30, ch:20,
+                    req:"temple",
+                    enkiLog:"LOG: Cultural exchange archetype. Present only in high-complexity DNA paths." },
 };
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  NOCTURNAL THREAT DEFINITIONS
+// ═══════════════════════════════════════════════════════════════════════════
+export const THREAT_DEF = {
+  toyol: {
+    icon: "👁️", name: "Toyol",
+    spawnChance: 0.004, // per tick at night
+    stealRate: { food: 2, wood: 2 },
+    duration: 8,
+    counter: "spiritTrap",
+    enkiLog: "LOG: Bio-drone remnant detected. Anunnaki resource audit protocol active.",
+  },
+  orangMinyak: {
+    icon: "🫥", name: "Orang Minyak",
+    spawnChance: 0.002,
+    tileBlock: true,
+    duration: 20,
+    counter: "temple",
+    enkiLog: "LOG: Unstable genetic template detected. Prototype still active on legacy code.",
+  },
+  whisperStorm: {
+    icon: "🌀", name: "Whisper Storm",
+    spawnChance: 0.001,
+    efficiencyDrain: 0.5,
+    duration: 1, // lasts 1 tick, sets whisperActive for next tick
+    counter: "shaman", // any shaman-staffed building present
+    enkiLog: "LOG: Anunnaki Memory Pulse detected. Ancestral trauma broadcasting from genome.",
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  NIGHT MARKET
+// ═══════════════════════════════════════════════════════════════════════════
+export const MARKET_ITEMS = [
+  { id:"foodBundle",   label:"Salted Provisions",   icon:"🍖",
+    gives:{ food:20 },        costs:{ wood:15 } },
+  { id:"woodBundle",   label:"Timber Cache",         icon:"🪵",
+    gives:{ wood:20 },        costs:{ food:15 } },
+  { id:"stoneBundle",  label:"Quarried Blocks",      icon:"🪨",
+    gives:{ stone:20 },       costs:{ wood:12 } },
+  { id:"hidesBundle",  label:"Cured Hides",          icon:"🪶",
+    gives:{ hides:15 },       costs:{ food:10 } },
+  { id:"anunnakiShard",label:"Anunnaki Shard",        icon:"💠",
+    gives:{ hides:5, stone:5 }, costs:{ food:20, wood:10 },
+    rare: true,
+    enkiLog:"LOG: Artifact predates simulation timeline by 4,000 years. Flagged as Deep-Layer Exchange." },
+];
+
+function generateMarketOffers(tech) {
+  const pool = tech?.orangBunianContact ? MARKET_ITEMS : MARKET_ITEMS.slice(0, 4);
+  // Fisher-Yates shuffle
+  const arr = [...pool];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr.slice(0, 3);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  HELPERS
@@ -143,48 +275,99 @@ export function mkNodes() {
   return nodes;
 }
 
+export function calcCaps(grid, tech = {}) {
+  let food = DEFAULT_CAPS.food + (tech.surplusStorage ? 40 : 0) + (tech.preservation ? Math.ceil(DEFAULT_CAPS.food * 0.25) : 0);
+  let wood = DEFAULT_CAPS.wood + (tech.surplusStorage ? 40 : 0);
+  let stone = DEFAULT_CAPS.stone + (tech.surplusStorage ? 40 : 0);
+  let hides = DEFAULT_CAPS.hides + (tech.surplusStorage ? 40 : 0);
+  for (let r = 0; r < GH; r++) {
+    for (let c = 0; c < GW; c++) {
+      const cell = grid[r][c]; if (!cell) continue;
+      if (cell.id === 'granary')   food  += 60 * LV_MULT[cell.level - 1];
+      if (cell.id === 'warehouse') {
+        wood  += 80 * LV_MULT[cell.level - 1];
+        stone += 80 * LV_MULT[cell.level - 1];
+        hides += 60 * LV_MULT[cell.level - 1];
+      }
+    }
+  }
+  return { food: Math.ceil(food), wood: Math.ceil(wood), stone: Math.ceil(stone), hides: Math.ceil(hides) };
+}
+
 // Aggregate stats + per-building breakdown
 export function calcStats(st) {
   let housing = BASE_HOUSING, workNeeded = 0;
-  let rawFood = 0, rawWood = 0, rawStone = 0;
-  const bldgBreakdown = {}; // id → { count, workers, food, wood, stone, housing }
+  let rawFood = 0, rawWood = 0, rawStone = 0, rawHides = 0;
+  const bldgBreakdown = {};
+
+  // Mutable copy of role pools
+  const rolePool = { ...(st.roles || { gatherer:0, woodcutter:0, mason:0, hunter:0, shaman:0 }) };
+  // Idle settlers (not assigned to any role) — they can fill any role at 50% efficiency
+  const totalAssigned = Object.values(rolePool).reduce((a, b) => a + b, 0);
+  let idlePool = Math.max(0, st.pop - totalAssigned);
 
   for (let r = 0; r < GH; r++) {
     for (let c = 0; c < GW; c++) {
       const cell = st.grid[r][c]; if (!cell) continue;
       const { id, level } = cell;
-      const b = BLDG[id];
-      const w = bldgWorkers(b, level);
-      housing    += bldgHousing(b, level);
-      workNeeded += w;
-      rawFood    += bldgRate(b, "food",  level);
-      rawWood    += bldgRate(b, "wood",  level);
-      rawStone   += bldgRate(b, "stone", level);
-      if (!bldgBreakdown[id]) bldgBreakdown[id] = { count:0, workers:0, food:0, wood:0, stone:0, housing:0, levels:[] };
+      const b = BLDG[id]; if (!b) continue;
+      const needWorkers = bldgWorkers(b, level);
+      const preferredRole = BLDG_ROLE[id];
+      workNeeded += needWorkers;
+      housing += bldgHousing(b, level);
+
+      // Staff building: preferred role first, then idle at 50% efficiency
+      let staffedPref = 0, staffedIdle = 0;
+      if (needWorkers > 0 && preferredRole && rolePool[preferredRole] > 0) {
+        staffedPref = Math.min(rolePool[preferredRole], needWorkers);
+        rolePool[preferredRole] -= staffedPref;
+      }
+      const remaining = needWorkers - staffedPref;
+      if (remaining > 0 && idlePool > 0) {
+        staffedIdle = Math.min(idlePool, remaining);
+        idlePool -= staffedIdle;
+      }
+
+      const efficiency = needWorkers > 0
+        ? (staffedPref * (ROLES[preferredRole]?.mult || 1.0) + staffedIdle * 0.5) / needWorkers
+        : 1.0;
+
+      rawFood  += bldgRate(b, "food",  level) * efficiency;
+      rawWood  += bldgRate(b, "wood",  level) * efficiency;
+      rawStone += bldgRate(b, "stone", level) * efficiency;
+      rawHides += (b.hides || 0) * LV_MULT[level - 1] * efficiency;
+
+      if (!bldgBreakdown[id]) bldgBreakdown[id] = { count:0, workers:0, food:0, wood:0, stone:0, hides:0, housing:0, levels:[] };
       bldgBreakdown[id].count++;
-      bldgBreakdown[id].workers += w;
-      bldgBreakdown[id].food    += bldgRate(b,"food",level);
-      bldgBreakdown[id].wood    += bldgRate(b,"wood",level);
-      bldgBreakdown[id].stone   += bldgRate(b,"stone",level);
-      bldgBreakdown[id].housing += bldgHousing(b,level);
+      bldgBreakdown[id].workers  += needWorkers;
+      bldgBreakdown[id].food     += bldgRate(b,"food",level)   * efficiency;
+      bldgBreakdown[id].wood     += bldgRate(b,"wood",level)   * efficiency;
+      bldgBreakdown[id].stone    += bldgRate(b,"stone",level)  * efficiency;
+      bldgBreakdown[id].hides    += (b.hides||0) * LV_MULT[level-1] * efficiency;
+      bldgBreakdown[id].housing  += bldgHousing(b,level);
       bldgBreakdown[id].levels.push(level);
     }
   }
 
-  const employed  = Math.min(st.pop, workNeeded);
-  const scale     = workNeeded > 0 ? employed / workNeeded : 0;
-  const dMult     = st.drought.active ? 0.5 : 1.0;
-  const tMult     = st.tech.toolCrafting ? 1.25 : 1.0;
-  const passFood  = st.tech.animalHusbandry ? 2 : 0;
-  const effFood   = rawFood  * scale * dMult * tMult + passFood;
-  const effWood   = rawWood  * scale * tMult;
-  const effStone  = rawStone * scale * tMult;
-  const consume   = st.pop * FOOD_PER_POP;
+  const employed   = st.pop - idlePool;  // workers actually working
+  const scale      = workNeeded > 0 ? Math.min(1, employed / workNeeded) : 0;
+  const dMult      = (st.drought?.active) ? 0.5 : 1.0;
+  const tMult      = st.tech?.toolCrafting ? 1.25 : 1.0;
+  const hideMult   = st.tech?.hideTanning  ? 1.5  : 1.0;
+  const passFood   = st.tech?.animalHusbandry ? 2 : 0;
+
+  const effFood    = rawFood  * dMult * tMult + passFood;
+  const effWood    = rawWood  * tMult;
+  const effStone   = rawStone * tMult;
+  const hidesRate  = rawHides * tMult * hideMult;
+  const consume    = st.pop * FOOD_PER_POP;
+
+  const wMult = st.whisperActive ? 0.5 : 1.0;
 
   return {
     housing, workNeeded, employed, scale,
-    foodProd: effFood, woodRate: effWood, stoneRate: effStone,
-    consume, netFood: effFood - consume, passFood,
+    foodProd: effFood * wMult, woodRate: effWood * wMult, stoneRate: effStone * wMult, hidesRate: hidesRate * wMult,
+    consume, netFood: effFood * wMult - consume, passFood,
     bldgBreakdown, rawFood, rawWood, rawStone,
   };
 }
@@ -209,23 +392,114 @@ export function doTick(st) {
   let wood  = Math.max(0, f1(res.wood  + s.woodRate));
   let stone = Math.max(0, f1(res.stone + s.stoneRate));
 
+  // ── Day phase ────────────────────────────────────────────────────────────
+  const dayPhase = (t * TICK_MS / DAY_MS) % 1;
+  const isNight  = dayPhase < 0.25 || dayPhase > 0.75;
+
+  // ── Tick down and expire threats ─────────────────────────────────────────
+  let threats = (st.threats || [])
+    .map(th => ({ ...th, ticks: th.ticks - 1 }))
+    .filter(th => th.ticks > 0);
+
+  // ── Toyol: steal resources ────────────────────────────────────────────────
+  const hasToyol      = threats.some(th => th.type === 'toyol');
+  const hasSpiritTrap = gridHasBuilding(st.grid, 'spiritTrap');
+  // Bomoh tech halves all threat chances
+  const bomohActive   = st.tech.bomohArchetype || false;
+
+  if (hasToyol && !hasSpiritTrap && !bomohActive) {
+    food = Math.max(0, food - THREAT_DEF.toyol.stealRate.food);
+    wood = Math.max(0, wood - THREAT_DEF.toyol.stealRate.wood);
+  }
+
+  // ── Whisper Storm: set flag for next tick ─────────────────────────────────
+  const hasWhisper    = threats.some(th => th.type === 'whisperStorm');
+  const hasShamanBldg = gridHasBuilding(st.grid, 'spiritTrap') ||
+                        gridHasBuilding(st.grid, 'ritualCircle') ||
+                        gridHasBuilding(st.grid, 'temple');
+  const whisperActive = hasWhisper && !hasShamanBldg && !bomohActive;
+
+  // ── Spawn new threats (night only) ────────────────────────────────────────
+  if (isNight) {
+    Object.entries(THREAT_DEF).forEach(([type, def]) => {
+      const alreadyActive = threats.some(th => th.type === type);
+      if (!alreadyActive && Math.random() < (bomohActive ? def.spawnChance * 0.5 : def.spawnChance)) {
+        threats.push({ type, ticks: def.duration });
+        L = logPush(L, `${def.enkiLog} [${def.name} detected]`);
+      }
+    });
+  }
+
+  // Apply storage caps
+  const caps = calcCaps(st.grid, st.tech);
+  food  = Math.min(food,  caps.food);
+  wood  = Math.min(wood,  caps.wood);
+  stone = Math.min(stone, caps.stone);
+  let hides = Math.min(Math.max(0, f1(res.hides + s.hidesRate)), caps.hides);
+
   // Drought
   let da = drought.active, dt = drought.ticks, famine = false;
-  if (da) { dt--; if (dt <= 0) { da=false; dt=0; famine=true; L=logPush(L,"☀️ Drought breaks… famine follows."); } }
-  if (!da && food < DROUGHT_FOOD) { da=true; dt=DROUGHT_LEN; L=logPush(L,`🌵 DROUGHT! Food halved for ${DROUGHT_LEN} ticks!`); }
+  if (da) { dt--; if (dt <= 0) { da=false; dt=0; famine=true; L=logPush(L,"LOG-CRITICAL: Drought ended. Caloric deficit critical. Famine threshold breached."); } }
+  const droughtThreshold = st.tech.preservation ? Math.floor(DROUGHT_FOOD * 0.6) : DROUGHT_FOOD;
+  if (!da && food < droughtThreshold) { da=true; dt=DROUGHT_LEN; L=logPush(L,`LOG-WARNING: Drought event. Food production halved for ${DROUGHT_LEN} ticks. Genomic stress response active.`); }
 
   // Population
   let p = pop;
-  if (famine) { p=Math.max(1,Math.ceil(p*0.9)); if (p<pop) L=logPush(L,`☠️ FAMINE — population: ${p}!`); }
-  else if (food===0 && p>1 && t%3===0) { p--; L=logPush(L,`💀 Starvation! Pop: ${p}`); }
-  else if (food>0 && p<s.housing && t%5===0) { p++; L=logPush(L,`👶 New settler! Pop: ${p}`); }
+  if (famine) { p=Math.max(1,Math.ceil(p*0.9)); if (p<pop) L=logPush(L,`LOG-CRITICAL: FAMINE. Population reduced to ${p}. Stress-testing survival threshold.`); }
+  else if (food===0 && p>1 && t%3===0) { p--; L=logPush(L,`LOG-WARNING: Starvation event. Population: ${p}. This DNA path is under stress.`); }
+  else if (food>0 && p<s.housing && t%5===0) { p++; L=logPush(L,`LOG: Population +1. Settlement: ${p}. Genomic viability increasing.`); }
 
-  if (p!==pop && p===10) L=logPush(L,"🏛️ A growing tribe — 10 souls!");
-  if (p!==pop && p===20) L=logPush(L,"⚔️ Settlement swells to 20!");
-  if (wood >100&&res.wood <=100) L=logPush(L,"🪵 Lumber stores overflow!");
-  if (stone>100&&res.stone<=100) L=logPush(L,"🪨 Stone reserves grow immense!");
+  if (p!==pop && p===10) L=logPush(L,"LOG: Settlement reaches 10 souls. Tier 1 viability score: RISING.");
+  if (p!==pop && p===20) L=logPush(L,"LOG: 20 settlers. The DNA path is stabilising.");
+  if (wood >100&&res.wood <=100) L=logPush(L,"LOG: Wood reserves exceed baseline. Storage expansion recommended.");
+  if (stone>100&&res.stone<=100) L=logPush(L,"LOG: Stone reserves exceed baseline. Quarry efficiency noted.");
 
-  return { ...st, res:{food,wood,stone}, pop:p, log:L, nodes, drought:{active:da,ticks:dt}, tick:t+1 };
+  // ── Night Market ──────────────────────────────────────────────────────────
+  const coverage = calcGenomicCoverage(st);
+  let nightMarket = st.nightMarket || { unlocked: false, open: false, offers: [] };
+
+  if (!nightMarket.unlocked && coverage >= 60) {
+    nightMarket = { ...nightMarket, unlocked: true };
+    L = logPush(L, "LOG: Night Market protocol active. Awaiting nightfall to open.");
+  }
+
+  if (nightMarket.unlocked) {
+    const nowOpen = isNight; // isNight already computed earlier in doTick
+    // Refresh offers when market transitions to open
+    if (nowOpen && !nightMarket.open) {
+      nightMarket = { ...nightMarket, open: true, offers: generateMarketOffers(st.tech) };
+    } else if (!nowOpen && nightMarket.open) {
+      nightMarket = { ...nightMarket, open: false };
+    }
+  }
+
+  // Genetic marker accumulation every 10 ticks
+  let markers = st.markers || { combatReflex: 0, orichalcumTuning: 0, systemCoherence: 0 };
+  if (t % 10 === 0 && st.pop > 0) {
+    const roles = st.roles || {};
+    const hunterFrac  = (roles.hunter  || 0) / st.pop;
+    const builderFrac = ((roles.mason  || 0) + (roles.woodcutter || 0)) / st.pop;
+    const shamanFrac  = (roles.shaman  || 0) / st.pop;
+    markers = {
+      combatReflex:     f1(markers.combatReflex     + (hunterFrac  > 0.3 ? 0.1 : 0)),
+      orichalcumTuning: f1(markers.orichalcumTuning + (builderFrac > 0.4 ? 0.1 : 0)),
+      systemCoherence:  f1(markers.systemCoherence  + (shamanFrac  > 0.1 ? 0.1 : 0)),
+    };
+  }
+
+  return { ...st, res:{food,wood,stone,hides}, pop:p, log:L, nodes,
+           drought:{active:da,ticks:dt}, tick:t+1,
+           threats, whisperActive, dayPhase, markers, nightMarket };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  HELPERS (game-logic internal)
+// ═══════════════════════════════════════════════════════════════════════════
+export function gridHasBuilding(grid, id) {
+  for (let r = 0; r < GH; r++)
+    for (let c = 0; c < GW; c++)
+      if (grid[r][c]?.id === id) return true;
+  return false;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -249,7 +523,7 @@ export function reducer(st, a) {
         ?`${def.icon} ${def.label} depleted — ${parts.join(" ")} (respawns ~${def.respawn}t)`
         :`${def.icon} ${def.verb}! ${parts.join(" ")} — ${newCh} charge${newCh!==1?"s":""} left`;
       return { ...st, nodes, log:logPush(st.log,msg),
-               res:{food:f1(st.res.food+def.food), wood:f1(st.res.wood+def.wood), stone:f1(st.res.stone+def.stone)} };
+               res:{...st.res, food:f1(st.res.food+def.food), wood:f1(st.res.wood+def.wood), stone:f1(st.res.stone+def.stone)} };
     }
 
     // ── Place building (or gather if live node) ───────────────────────────
@@ -282,7 +556,9 @@ export function reducer(st, a) {
       const prodLabel=b.food>0?`+${f1(bldgRate(b,"food",toLvl))}🍖/t`
         :b.wood>0?`+${f1(bldgRate(b,"wood",toLvl))}🪵/t`
         :b.stone>0?`+${f1(bldgRate(b,"stone",toLvl))}🪨/t`
-        :b.housing>0?`+${bldgHousing(b,toLvl)} housing`:"";
+        :b.housing>0?`+${bldgHousing(b,toLvl)} housing`
+        :b.hides>0?`+${f1(b.hides * LV_MULT[toLvl-1])}🪶/t`
+        :"";
       return {...st,grid:g,res:{...st.res,wood:st.res.wood-cost.cw,stone:st.res.stone-cost.cs},
               log:logPush(st.log,`⬆️ ${b.name} → Level ${LV_ROM[toLvl-1]} · ${prodLabel} · 👷${newW} workers`)};
     }
@@ -308,12 +584,67 @@ export function reducer(st, a) {
     case "SPEED":    return { ...st, speed: a.v };
 
     case "RESEARCH": {
-      const tech=TECH[a.id]; if (!tech||st.tech[a.id]) return st;
-      if (st.res.wood<tech.cw||st.res.stone<tech.cs)
-        return {...st,log:logPush(st.log,`❌ Need 🪵${tech.cw} 🪨${tech.cs} for ${tech.name}`)};
-      return {...st,tech:{...st.tech,[a.id]:true},
-              res:{...st.res,wood:st.res.wood-tech.cw,stone:st.res.stone-tech.cs},
-              log:logPush(st.log,`🔬 ${tech.name} discovered!`)};
+      const tech = TECH[a.id]; if (!tech || st.tech[a.id]) return st;
+      if (tech.req && !gridHasBuilding(st.grid, tech.req))
+        return { ...st, log: logPush(st.log, `🔒 ${tech.name} requires ${BLDG[tech.req]?.name || tech.req}`) };
+      const disc = st.tech.stoneMasonry ? 0.7 : 1.0;
+      const cw = Math.ceil((tech.cw || 0) * disc);
+      const cs = Math.ceil((tech.cs || 0) * disc);
+      const ch = tech.ch || 0;
+      if (st.res.wood < cw || st.res.stone < cs || st.res.hides < ch)
+        return { ...st, log: logPush(st.log, `❌ Need 🪵${cw} 🪨${cs}${ch ? ` 🪶${ch}` : ""} for ${tech.name}`) };
+      const msg = tech.enkiLog
+        ? `${tech.enkiLog} [${tech.name} decoded]`
+        : `🔬 ${tech.name} — ancestral pathway recovered.`;
+      return {
+        ...st,
+        tech: { ...st.tech, [a.id]: true },
+        res: { ...st.res, wood: st.res.wood - cw, stone: st.res.stone - cs, hides: st.res.hides - ch },
+        log: logPush(st.log, msg),
+      };
+    }
+
+    case "SET_ROLE": {
+      if (a.delta === 0) return st;
+      const newVal = Math.max(0, (st.roles[a.role] || 0) + a.delta);
+      let newRoles = { ...st.roles, [a.role]: newVal };
+      let total = Object.values(newRoles).reduce((x, y) => x + y, 0);
+      // If total exceeds pop, clamp by reducing other roles (largest first)
+      while (total > st.pop) {
+        const others = Object.entries(newRoles)
+          .filter(([k, v]) => k !== a.role && v > 0)
+          .sort((x, y) => y[1] - x[1]);
+        if (!others.length) {
+          // Can't reduce others — cap the target role itself
+          newRoles = { ...newRoles, [a.role]: Math.max(0, newRoles[a.role] - (total - st.pop)) };
+          break;
+        }
+        const [reduceKey] = others[0];
+        newRoles = { ...newRoles, [reduceKey]: newRoles[reduceKey] - 1 };
+        total--;
+      }
+      return { ...st, roles: newRoles };
+    }
+
+    case "BUY_MARKET": {
+      const nm = st.nightMarket;
+      if (!nm?.open) return st;
+      const offer = nm.offers.find(o => o.id === a.id);
+      if (!offer) return st;
+      // Check can afford
+      const canAfford = Object.entries(offer.costs).every(([k, v]) => (st.res[k] || 0) >= v);
+      if (!canAfford)
+        return { ...st, log: logPush(st.log, `❌ Cannot afford ${offer.label}`) };
+      // Apply transaction
+      const newRes = { ...st.res };
+      Object.entries(offer.costs).forEach(([k, v]) => { newRes[k] = f1(newRes[k] - v); });
+      Object.entries(offer.gives).forEach(([k, v]) => { newRes[k] = f1((newRes[k] || 0) + v); });
+      const caps = calcCaps(st.grid, st.tech);
+      Object.keys(offer.gives).forEach(k => { newRes[k] = Math.min(newRes[k], caps[k]); });
+      const msg = offer.enkiLog
+        ? `${offer.enkiLog} [${offer.label} acquired]`
+        : `🌙 Night Market: traded for ${offer.label}.`;
+      return { ...st, res: newRes, log: logPush(st.log, msg) };
     }
 
     case "NEW_GAME": return initState();
@@ -324,17 +655,52 @@ export function reducer(st, a) {
 export function initState() {
   const tech = Object.fromEntries(Object.keys(TECH).map(k => [k, false]));
   return {
-    res: { food:30, wood:15, stone:8 },
+    res: { food:30, wood:15, stone:8, hides:0 },
     pop: 4, grid: mkGrid(), nodes: mkNodes(), log: [
-      "🌅 A new age dawns upon the land…",
-      "🌳 Click trees, rocks, berries & deer to gather resources!",
-      "🏗️ Build mode: place buildings on empty tiles.",
-      "⬆️ Upgrade mode: click a building to level it up.",
-      "💡 Higher levels need more workers but produce much more!",
+      "ENKI-PROTOCOL // SIMULATION_INIT // TIER_1 // ITERATION_[UNKNOWN]",
+      "The DNA sample is 12,000 years old. It remembers a winter that should have ended us.",
+      "Six people. A clearing. Tools. A fire that is not yet lit.",
+      "LOG-0001: Hut construction detected. Shelter archetype — present in 100% of viable DNA paths.",
+      "// Click trees, rocks, berries to gather. Build. Research. Survive. //",
     ],
     tech, drought:{active:false,ticks:0},
     tick:0, paused:false, speed:1, sel:"hut",
+    roles:   { gatherer: 2, woodcutter: 1, mason: 1, hunter: 0, shaman: 0 },
+    markers: { combatReflex: 0, orichalcumTuning: 0, systemCoherence: 0 },
+    threats: [],           // [{ type: string, ticks: number }]
+    whisperActive: false,  // true = efficiency halved this tick (from whisperStorm last tick)
+    dayPhase: 0.5,         // 0=midnight, 0.5=noon, drives isNight check
+    nightMarket: { unlocked: false, open: false, offers: [] },
   };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  GENOMIC COVERAGE
+// ═══════════════════════════════════════════════════════════════════════════
+export function calcGenomicCoverage(st) {
+  // Points system — normalised to 100
+  // Buildings: 3pts each (max ~16 buildings * 3 = 48)
+  // Techs: 5pts each, folklore techs 8pts each (max 15*5 + 3*8 = 99)
+  // Genetic markers: 2pts per unit (slow accumulation)
+  // Total possible ~150+ — normalise to 100 with /1.5 divisor
+
+  let pts = 0;
+
+  // Buildings on grid
+  for (let r = 0; r < GH; r++)
+    for (let c = 0; c < GW; c++)
+      if (st.grid[r][c]) pts += 3;
+
+  // Techs researched
+  Object.entries(TECH).forEach(([k, def]) => {
+    if (st.tech[k]) pts += def.group === 'nusantaraFolklore' ? 8 : 5;
+  });
+
+  // Genetic markers
+  const m = st.markers || {};
+  pts += ((m.combatReflex || 0) + (m.orichalcumTuning || 0) + (m.systemCoherence || 0)) * 2;
+
+  return Math.min(100, Math.round((pts / 150) * 100));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

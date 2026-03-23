@@ -1,5 +1,13 @@
 import { useState, useEffect, useReducer, useRef, useCallback } from "react";
-import { GW, GH, MAX_LVL, BASE_HOUSING, TICK_MS, DAY_MS, MAX_LOG, DROUGHT_FOOD, DROUGHT_LEN, FOOD_PER_POP, TILE_PX, LV_MULT, LV_XWORK, LV_ROM, NODE_DEF, NODE_POOL, BLDG, TECH_GROUPS, TECH, f1, sign, logPush, nodeKey, upgCost, bldgWorkers, bldgRate, bldgHousing, mkGrid, mkNodes, calcStats, doTick, reducer, initState, calcDayNight } from './game-logic.js';
+import { GW, GH, MAX_LVL, TICK_MS, DAY_MS, DROUGHT_FOOD, TILE_PX, LV_MULT, LV_XWORK, LV_ROM, NODE_DEF, BLDG, TECH_GROUPS, TECH, ROLES, f1, sign, nodeKey, upgCost, bldgWorkers, bldgRate, bldgHousing, calcStats, reducer, initState, calcDayNight, THREAT_DEF, calcGenomicCoverage, calcCaps } from './game-logic.js';
+
+// Resource metadata used by Night Market UI
+const RES_META = [
+  { k:"food",  e:"🍖", label:"Food"  },
+  { k:"wood",  e:"🪵", label:"Wood"  },
+  { k:"stone", e:"🪨", label:"Stone" },
+  { k:"hides", e:"🪶", label:"Hides" },
+];
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  SUB-COMPONENTS
@@ -61,6 +69,7 @@ function BldgBtn({ id, b, selected, canAfford, locked, onClick }) {
         {b.food>0&&<span style={{ color:"#72E472" }}>+{b.food}🍖/t </span>}
         {b.wood>0&&<span style={{ color:"#72E472" }}>+{b.wood}🪵/t </span>}
         {b.stone>0&&<span style={{ color:"#72E472" }}>+{b.stone}🪨/t </span>}
+        {b.hides>0&&<span style={{ color:"#72E472" }}>🪶+{b.hides}/t </span>}
         {b.workers>0&&<span style={{ color:"#7A6050" }}>👷{b.workers}</span>}
         {locked&&<span style={{ color:"#5A3010" }}> — research needed</span>}
       </div>
@@ -68,21 +77,24 @@ function BldgBtn({ id, b, selected, canAfford, locked, onClick }) {
   );
 }
 
-function TechBtn({ id, tech, done, canAfford, onResearch }) {
-  const isUnlock = tech.group==="unlock";
+function TechBtn({ id, tech, done, canAfford, locked, onResearch }) {
+  const isUnlock = tech.group===TECH_GROUPS[0];
   return (
-    <button onClick={onResearch} disabled={done} style={{
+    <button onClick={onResearch} disabled={done||locked} style={{
       width:"100%", textAlign:"left", padding:"5px 7px", marginBottom:2,
       background:done?(isUnlock?"#101A08":"#0E0E18"):"#100804",
       border:`1px solid ${done?(isUnlock?"#2A5010":"#1A1A40"):"#221008"}`,
-      color:done?(isUnlock?"#4A8030":"#4A4A90"):"#C47C2A",
-      cursor:done?"default":canAfford?"pointer":"not-allowed",
-      opacity:done?0.7:canAfford?1:0.5,
+      color:done?(isUnlock?"#4A8030":"#4A4A90"):locked?"#4A3040":"#C47C2A",
+      cursor:done||locked?"not-allowed":canAfford?"pointer":"not-allowed",
+      opacity:done?0.7:locked?0.4:canAfford?1:0.5,
       transition:"all .1s", fontFamily:"'Cinzel',serif", outline:"none",
     }}>
-      <div style={{ fontSize:10, marginBottom:1 }}>{done?"✅":tech.icon} {tech.name}</div>
+      <div style={{ fontSize:10, marginBottom:1 }}>{done?"✅":locked?"🔒":tech.icon} {tech.name}</div>
       <div style={{ fontSize:8, color:done?(isUnlock?"#3A6020":"#3A3A70"):"#4A3020", lineHeight:1.5 }}>{tech.desc}</div>
-      {!done&&<div style={{ fontSize:8, color:canAfford?"#C47C2A":"#4A3018", marginTop:2 }}>🪵{tech.cw} 🪨{tech.cs}</div>}
+      {!done&&<div style={{ fontSize:8, color:canAfford?"#C47C2A":"#4A3018", marginTop:2 }}>
+        🪵{tech.cw} 🪨{tech.cs}{tech.ch > 0 && <span> 🪶{tech.ch}</span>}
+        {locked && tech.req && <span style={{ color:"#4A2040" }}> — needs {BLDG[tech.req]?.name||tech.req}</span>}
+      </div>}
     </button>
   );
 }
@@ -120,8 +132,113 @@ function BldgRow({ id, bd, scale, masonry }) {
         {bd.food >0&&<span style={{ color:"#72E472" }}>🍖+{scaledFood}/t</span>}
         {bd.wood >0&&<span style={{ color:"#72E472" }}>🪵+{scaledWood}/t</span>}
         {bd.stone>0&&<span style={{ color:"#72E472" }}>🪨+{scaledStone}/t</span>}
+        {bd.hides>0&&<span>🪶+{f1(bd.hides * scale)}/t </span>}
         {bd.housing>0&&<span style={{ color:"#8AB0D8" }}>🏠{bd.housing} cap</span>}
       </div>
+    </div>
+  );
+}
+
+function TribePanel({ roles, pop, markers, dispatch }) {
+  const totalAssigned = Object.values(roles).reduce((a, b) => a + b, 0);
+  const idle = pop - totalAssigned;
+
+  return (
+    <div style={{ marginBottom:7, padding:"7px 9px",
+                  background:"rgba(0,0,0,0.28)", border:"1px solid #1E1008" }}>
+      <PH>Tribe · {pop} Settlers</PH>
+
+      {Object.entries(ROLES).map(([key, def]) => (
+        <div key={key} style={{ display:"flex", alignItems:"center",
+                                 justifyContent:"space-between", marginBottom:3 }}>
+          <span style={{ fontSize:10, color:"#C47C2A", minWidth:90 }}>
+            {def.icon} {def.name}
+          </span>
+          <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+            <button
+              onClick={() => dispatch({ type:"SET_ROLE", role:key, delta:-1 })}
+              style={tribeBtnStyle}
+            >−</button>
+            <span style={{ fontSize:11, color:"#F0A850", width:16, textAlign:"center" }}>
+              {roles[key] || 0}
+            </span>
+            <button
+              onClick={() => dispatch({ type:"SET_ROLE", role:key, delta:+1 })}
+              style={tribeBtnStyle}
+            >+</button>
+          </div>
+        </div>
+      ))}
+
+      {idle > 0 && (
+        <div style={{ fontSize:9, color:"#7A5030", marginTop:3,
+                      fontFamily:"'Crimson Text',serif", fontStyle:"italic" }}>
+          ⚠ {idle} idle — assign to roles for full output
+        </div>
+      )}
+
+      {/* Genetic markers */}
+      <div style={{ marginTop:6, paddingTop:4, borderTop:"1px solid #1A0E04",
+                    display:"flex", gap:10, fontSize:9 }}>
+        <span title="Combat Reflex — hunter specialisation" style={{ color:"#C87060" }}>
+          ⚔️ {markers.combatReflex}
+        </span>
+        <span title="Orichalcum Tuning — builder/scholar specialisation" style={{ color:"#60A0C8" }}>
+          💎 {markers.orichalcumTuning}
+        </span>
+        <span title="System Coherence — shaman/folklore specialisation" style={{ color:"#9070D0" }}>
+          🔮 {markers.systemCoherence}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+const tribeBtnStyle = {
+  width: 16, height: 16,
+  background: "#1A0E04", border: "1px solid #3A2010",
+  color: "#C47C2A", cursor: "pointer",
+  fontSize: 10, lineHeight: 1,
+  display: "flex", alignItems: "center", justifyContent: "center",
+  padding: 0, outline: "none",
+};
+
+function CoverageMeter({ coverage }) {
+  const pct = Math.min(100, coverage);
+  const barColor = pct >= 100 ? "#72E472" : pct >= 60 ? "#C4A020" : "#C47C2A";
+  return (
+    <div style={{ marginBottom:7, padding:"6px 9px",
+                  background:"rgba(0,0,0,0.28)", border:"1px solid #1E1008" }}>
+      <div style={{ display:"flex", justifyContent:"space-between",
+                    fontSize:8.5, marginBottom:4, letterSpacing:"0.08em" }}>
+        <span style={{ color:"#4A3020", fontFamily:"'Courier New',monospace" }}>
+          ENKI-PROTOCOL // TIER 1 GENOMIC COVERAGE
+        </span>
+        <span style={{ color: barColor, fontFamily:"'Courier New',monospace" }}>
+          {pct}%
+        </span>
+      </div>
+      <div style={{ height:4, background:"#1A0E04", borderRadius:2, overflow:"hidden" }}>
+        <div style={{
+          height:"100%", width:`${pct}%`,
+          background: barColor,
+          borderRadius:2,
+          transition:"width 0.4s ease",
+          boxShadow: pct >= 100 ? `0 0 6px ${barColor}` : "none",
+        }} />
+      </div>
+      {pct >= 100 && (
+        <div style={{ fontSize:8.5, color:"#72E472", marginTop:4,
+                      fontFamily:"'Courier New',monospace", letterSpacing:"0.05em" }}>
+          ✦ TIER 1 COMPLETE — SUMERIAN UPLIFT APPROACHING
+        </div>
+      )}
+      {pct >= 60 && pct < 100 && (
+        <div style={{ fontSize:8.5, color:"#9A7020", marginTop:4,
+                      fontFamily:"'Crimson Text',serif", fontStyle:"italic" }}>
+          Night Market unlocking…
+        </div>
+      )}
     </div>
   );
 }
@@ -153,9 +270,11 @@ export default function App() {
     return () => cancelAnimationFrame(rafRef.current);
   }, []);
 
-  const sky   = calcDayNight(phase);
-  const stats = calcStats(st);
-  const { res, pop, sel, paused, speed, log, drought, tick, tech, nodes } = st;
+  const sky      = calcDayNight(phase);
+  const stats    = calcStats(st);
+  const coverage = calcGenomicCoverage(st);
+  const caps     = calcCaps(st.grid, st.tech);
+  const { res, pop, sel, paused, speed, log, drought, tick, tech, nodes, roles, markers } = st;
   const selBldg = BLDG[sel];
 
   const spawnFloat = useCallback((r, c, text, color="#72E472") => {
@@ -310,12 +429,30 @@ export default function App() {
         <Stat icon="👥" label="Population" value={`${pop} / ${stats.housing}`}
               sub={`${pop-stats.employed} idle · ${stats.employed} working`}
               alert={pop>=stats.housing} />
-        <Stat icon="🍖" label="Food" value={f1(res.food)} rate={stats.netFood}
+        <Stat icon="🍖" label="Food" value={`${f1(res.food)}/${caps.food}`} rate={stats.netFood}
               sub={`+${f1(stats.foodProd)} prod · −${f1(stats.consume)} eat`}
               alert={res.food<DROUGHT_FOOD} />
-        <Stat icon="🪵" label="Wood"  value={f1(res.wood)}  rate={stats.woodRate}  />
-        <Stat icon="🪨" label="Stone" value={f1(res.stone)} rate={stats.stoneRate} />
+        <Stat icon="🪵" label="Wood"  value={`${f1(res.wood)}/${caps.wood}`}   rate={stats.woodRate}  />
+        <Stat icon="🪨" label="Stone" value={`${f1(res.stone)}/${caps.stone}`} rate={stats.stoneRate} />
+        <Stat icon="🪶" label="Hides" value={`${f1(res.hides)}/${caps.hides}`} rate={stats.hidesRate} />
       </div>
+
+      {/* Threat indicator */}
+      {st.threats && st.threats.length > 0 && (
+        <div style={{
+          padding:"4px 10px", marginBottom:4,
+          background:"rgba(80,0,0,0.4)", border:"1px solid #5A1010",
+          fontSize:10, color:"#E47272", fontFamily:"'Cinzel',serif",
+          display:"flex", gap:12, flexWrap:"wrap",
+        }}>
+          {st.threats.map((th, i) => (
+            <span key={i}>
+              {THREAT_DEF[th.type].icon} {THREAT_DEF[th.type].name} ({th.ticks}t)
+            </span>
+          ))}
+          {st.whisperActive && <span style={{ color:"#C870D8" }}>🌀 Whisper active — efficiency halved</span>}
+        </div>
+      )}
 
       {/* ── BODY ───────────────────────────────────────────────────────────── */}
       <div style={{ display:"flex", gap:7, alignItems:"flex-start" }}>
@@ -392,20 +529,18 @@ export default function App() {
 
           <div style={{ height:1, background:"#2A1808", margin:"8px 0 7px" }} />
 
-          {/* RESEARCH — two groups */}
-          <PH>Research — Unlocks</PH>
-          {Object.entries(TECH).filter(([,t])=>t.group==="unlock").map(([id,tech_]) => (
-            <TechBtn key={id} id={id} tech={tech_} done={tech[id]}
-                     canAfford={res.wood>=tech_.cw&&res.stone>=tech_.cs}
-                     onResearch={()=>dispatch({type:"RESEARCH",id})} />
-          ))}
-
-          <div style={{ height:1, background:"#2A1808", margin:"7px 0 6px" }} />
-          <PH>Research — Mastery</PH>
-          {Object.entries(TECH).filter(([,t])=>t.group==="mastery").map(([id,tech_]) => (
-            <TechBtn key={id} id={id} tech={tech_} done={tech[id]}
-                     canAfford={res.wood>=tech_.cw&&res.stone>=tech_.cs}
-                     onResearch={()=>dispatch({type:"RESEARCH",id})} />
+          {/* RESEARCH — iterate over TECH_GROUPS so adding a new group only requires updating the constant */}
+          {TECH_GROUPS.map((group, gi) => (
+            <div key={group}>
+              {gi > 0 && <div style={{ height:1, background:"#2A1808", margin:"7px 0 6px" }} />}
+              <PH>Research — {group.charAt(0).toUpperCase()+group.slice(1)}</PH>
+              {Object.entries(TECH).filter(([,t])=>t.group===group).map(([id,tech_]) => (
+                <TechBtn key={id} id={id} tech={tech_} done={tech[id]}
+                         canAfford={res.wood>=(tech_.cw||0)&&res.stone>=(tech_.cs||0)&&res.hides>=(tech_.ch||0)}
+                         locked={!!(tech_.req&&!st.grid.some(row=>row.some(cell=>cell?.id===tech_.req)))}
+                         onResearch={()=>dispatch({type:"RESEARCH",id})} />
+              ))}
+            </div>
           ))}
 
           <div style={{ height:1, background:"#2A1808", margin:"7px 0 6px" }} />
@@ -597,6 +732,51 @@ export default function App() {
             </div>
           )}
 
+          {/* Genomic Coverage */}
+          <CoverageMeter coverage={coverage} />
+
+          {/* Night Market */}
+          {st.nightMarket?.open && (
+            <div style={{ marginBottom:7, padding:"7px 9px",
+                          background:"rgba(10,0,30,0.75)", border:"1px solid #2A1A4A" }}>
+              <PH color="#9070D0">🌙 Night Market · Deep-Layer Exchange</PH>
+              {st.nightMarket.offers.map(offer => (
+                <button
+                  key={offer.id}
+                  onClick={() => dispatch({ type:"BUY_MARKET", id:offer.id })}
+                  style={{
+                    width:"100%", textAlign:"left", marginBottom:3, padding:"5px 7px",
+                    background:"#080618", border:"1px solid #2A1A4A",
+                    color:"#9070D0", cursor:"pointer", fontSize:9.5,
+                    fontFamily:"'Cinzel',serif", outline:"none",
+                    opacity: Object.entries(offer.costs).every(([k,v])=>(res[k]||0)>=v) ? 1 : 0.45,
+                  }}
+                >
+                  <span>{offer.icon} {offer.label}</span>
+                  <span style={{ float:"right", fontSize:8.5, color:"#6A5080" }}>
+                    {Object.entries(offer.costs).map(([k,v])=>`${RES_META.find(r=>r.k===k)?.e||k}${v}`).join(" ")}
+                    {" → "}
+                    {Object.entries(offer.gives).map(([k,v])=>`${RES_META.find(r=>r.k===k)?.e||k}${v}`).join(" ")}
+                  </span>
+                </button>
+              ))}
+              {tech?.orangBunianContact && (
+                <div style={{ fontSize:8, color:"#5A3A80", marginTop:3,
+                              fontFamily:"'Crimson Text',serif", fontStyle:"italic" }}>
+                  ✦ Rare artifacts available — Orang Bunian Contact active
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tribe Panel */}
+          <TribePanel
+            roles={roles}
+            pop={pop}
+            markers={markers}
+            dispatch={dispatch}
+          />
+
           {/* Buildings breakdown */}
           {Object.keys(stats.bldgBreakdown).length > 0 && (
             <div style={{ marginBottom:7, padding:"7px 9px",
@@ -622,6 +802,7 @@ export default function App() {
               ["🍖 Food",  `${sign(stats.netFood)}/t  (+${f1(stats.foodProd)} −${f1(stats.consume)})`],
               ["🪵 Wood",  `${sign(stats.woodRate)}/t`],
               ["🪨 Stone", `${sign(stats.stoneRate)}/t`],
+              ["🪶 Hides", `${sign(stats.hidesRate)}/t`],
               ["👷 Work",  `${stats.employed}/${stats.workNeeded} workers (${Math.round(stats.scale*100)}%)`],
               ["🏠 Cap",   `${pop}/${stats.housing} housing`],
             ].map(([k,v])=>(
@@ -641,14 +822,24 @@ export default function App() {
             background:"rgba(0,0,0,0.38)", border:"1px solid #1E1008",
             maxHeight:300, overflowY:"auto", padding:"5px 7px",
           }}>
-            {log.map((entry,i) => (
+            {log.map((entry,i) => {
+              const isProtocol = entry.startsWith("LOG") || entry.startsWith("ENKI") || entry.startsWith("//");
+              return (
               <div key={i} style={{
                 padding:"4px 0", borderBottom:"1px solid #120C04",
-                fontSize:10.5, lineHeight:1.45,
-                color: i===0?"#F0A850":`rgba(196,124,42,${Math.max(0.09,1-i*0.046)})`,
-                fontFamily:"'Crimson Text',serif",
+                lineHeight:1.45,
+                color: isProtocol
+                  ? `rgba(158,239,208,${Math.max(0.12, 1 - i * 0.05)})`
+                  : `rgba(196,124,42,${Math.max(0.09, 1 - i * 0.046)})`,
+                fontFamily: isProtocol
+                  ? "'Courier New', monospace"
+                  : "'Crimson Text', serif",
+                fontSize: isProtocol
+                  ? 9.5
+                  : 10.5,
               }}>{entry}</div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
