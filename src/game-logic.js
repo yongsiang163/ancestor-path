@@ -20,11 +20,11 @@ export const LV_ROM   = ["Ⅰ","Ⅱ","Ⅲ"];
 //  POPULATION ROLES
 // ═══════════════════════════════════════════════════════════════════════════
 export const ROLES = {
-  gatherer:  { name:"Gatherer",   icon:"🧺", works:["bonfire","berryFarm","fishery"],    bonus:"food",  mult:1.10 },
-  woodcutter:{ name:"Woodcutter", icon:"🪓", works:["woodCamp","forester"],              bonus:"wood",  mult:1.10 },
-  mason:     { name:"Mason",      icon:"⛏️",  works:["quarry","granary","warehouse"],     bonus:"stone", mult:1.10 },
-  hunter:    { name:"Hunter",     icon:"🏹", works:["hunt","tanningHut"],                bonus:"food",  mult:1.15 },
-  shaman:    { name:"Shaman",     icon:"🔮", works:["ritualCircle","eldersLodge"],       bonus:null,    mult:1.0  },
+  gatherer:  { name:"Gatherer",   icon:"🧺", works:["bonfire","berryFarm","fishery","herbGarden"], bonus:"food",  mult:1.10 },
+  woodcutter:{ name:"Woodcutter", icon:"🪓", works:["woodCamp","forester"],                        bonus:"wood",  mult:1.10 },
+  mason:     { name:"Mason",      icon:"⛏️",  works:["quarry","granary","warehouse"],               bonus:"stone", mult:1.10 },
+  hunter:    { name:"Hunter",     icon:"🏹", works:["hunt","tanningHut"],                          bonus:"food",  mult:1.15 },
+  shaman:    { name:"Shaman",     icon:"🔮", works:["ritualCircle","eldersLodge","spiritTrap","temple"], bonus:null, mult:1.0 },
 };
 
 // Reverse lookup: building id → preferred role key
