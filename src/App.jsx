@@ -315,6 +315,7 @@ export default function App() {
               alert={res.food<DROUGHT_FOOD} />
         <Stat icon="🪵" label="Wood"  value={f1(res.wood)}  rate={stats.woodRate}  />
         <Stat icon="🪨" label="Stone" value={f1(res.stone)} rate={stats.stoneRate} />
+        <Stat icon="🪶" label="Hides" value={f1(res.hides)} rate={stats.hidesRate} />
       </div>
 
       {/* ── BODY ───────────────────────────────────────────────────────────── */}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { initState, doTick, calcStats, DEFAULT_CAPS, calcCaps, reducer } from './game-logic.js';
+import { initState, doTick, calcStats, DEFAULT_CAPS, calcCaps, reducer, BLDG } from './game-logic.js';
 
 describe('initState', () => {
   it('starts with 4 pop and correct resources', () => {
@@ -58,6 +58,38 @@ describe('storage caps', () => {
   it('initState includes hides: 0 in res', () => {
     const st = initState();
     expect(st.res.hides).toBe(0);
+  });
+});
+
+describe('new buildings', () => {
+  it('BLDG has 16 buildings total', () => {
+    expect(Object.keys(BLDG).length).toBe(16);
+  });
+
+  it('tanningHut produces hides', () => {
+    const st = initState();
+    const grid = st.grid.map(r => [...r]);
+    grid[5][5] = { id: 'tanningHut', level: 1 };
+    const s = calcStats({ ...st, grid, pop: 10 });
+    expect(s.hidesRate).toBeGreaterThan(0);
+  });
+
+  it('granary increases food cap via calcCaps', () => {
+    const st = initState();
+    const grid = st.grid.map(r => [...r]);
+    grid[3][3] = { id: 'granary', level: 1 };
+    const caps = calcCaps(grid);
+    expect(caps.food).toBeGreaterThan(DEFAULT_CAPS.food);
+  });
+
+  it('warehouse increases wood/stone/hides caps via calcCaps', () => {
+    const st = initState();
+    const grid = st.grid.map(r => [...r]);
+    grid[3][3] = { id: 'warehouse', level: 1 };
+    const caps = calcCaps(grid);
+    expect(caps.wood).toBeGreaterThan(DEFAULT_CAPS.wood);
+    expect(caps.stone).toBeGreaterThan(DEFAULT_CAPS.stone);
+    expect(caps.hides).toBeGreaterThan(DEFAULT_CAPS.hides);
   });
 });
 

@@ -66,6 +66,30 @@ export const BLDG = {
                housing:0, workers:3, food:3, wood:0, stone:0, cw:15, cs:10, tech:"netFishing"     },
   berryFarm: { name:"Berry Farm",  icon:"🫐", bg:"#1A0828", border:"#502870",
                housing:0, workers:1, food:2, wood:0, stone:0, cw:8,  cs:5,  tech:"irrigation"     },
+  granary:     { name:"Granary",        icon:"🏚️", bg:"#2A1A0A", border:"#5A3A18",
+               housing:0, housingPerLevel:0, workers:2, food:0, wood:0, stone:0, hides:0,
+               cw:12, cs:8  },
+  warehouse:   { name:"Warehouse",      icon:"📦", bg:"#1A1A0A", border:"#4A4A20",
+               housing:0, housingPerLevel:0, workers:2, food:0, wood:0, stone:0, hides:0,
+               cw:15, cs:10 },
+  ritualCircle:{ name:"Ritual Circle",  icon:"🔵", bg:"#0A0A2A", border:"#2A2A70",
+               housing:0, housingPerLevel:0, workers:0, food:0, wood:0, stone:0, hides:0,
+               cw:15, cs:20, unlocksBranch:"ancestralMemory" },
+  tanningHut:  { name:"Tanning Hut",    icon:"🪶", bg:"#1A0E08", border:"#4A2A10",
+               housing:0, housingPerLevel:0, workers:2, food:0, wood:0, stone:0, hides:1,
+               cw:10, cs:6  },
+  herbGarden:  { name:"Herb Garden",    icon:"🌿", bg:"#061A06", border:"#1A5020",
+               housing:0, housingPerLevel:0, workers:1, food:0, wood:0, stone:0, hides:0,
+               cw:8,  cs:5,  growthBonus:0.5 },
+  spiritTrap:  { name:"Spirit Trap",    icon:"🕸️", bg:"#1A0A1A", border:"#4A1A4A",
+               housing:0, housingPerLevel:0, workers:1, food:0, wood:0, stone:0, hides:0,
+               cw:12, cs:8,  counters:"toyol" },
+  temple:      { name:"Temple",         icon:"🏯", bg:"#1A1208", border:"#504020",
+               housing:0, housingPerLevel:0, workers:2, food:0, wood:0, stone:0, hides:0,
+               cw:20, cs:15, counters:"orangMinyak" },
+  eldersLodge: { name:"Elder's Lodge",  icon:"🏛️", bg:"#120808", border:"#402020",
+               housing:0, housingPerLevel:0, workers:3, food:0, wood:0, stone:0, hides:0,
+               cw:20, cs:15, extraResearchSlot:true },
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -164,7 +188,7 @@ export function calcCaps(grid) {
 // Aggregate stats + per-building breakdown
 export function calcStats(st) {
   let housing = BASE_HOUSING, workNeeded = 0;
-  let rawFood = 0, rawWood = 0, rawStone = 0;
+  let rawFood = 0, rawWood = 0, rawStone = 0, rawHides = 0;
   const bldgBreakdown = {}; // id → { count, workers, food, wood, stone, housing }
 
   for (let r = 0; r < GH; r++) {
@@ -178,6 +202,7 @@ export function calcStats(st) {
       rawFood    += bldgRate(b, "food",  level);
       rawWood    += bldgRate(b, "wood",  level);
       rawStone   += bldgRate(b, "stone", level);
+      rawHides   += (b.hides || 0) * LV_MULT[level - 1];
       if (!bldgBreakdown[id]) bldgBreakdown[id] = { count:0, workers:0, food:0, wood:0, stone:0, housing:0, levels:[] };
       bldgBreakdown[id].count++;
       bldgBreakdown[id].workers += w;
@@ -197,13 +222,14 @@ export function calcStats(st) {
   const effFood   = rawFood  * scale * dMult * tMult + passFood;
   const effWood   = rawWood  * scale * tMult;
   const effStone  = rawStone * scale * tMult;
+  const hidesRate = rawHides * scale * tMult;
   const consume   = st.pop * FOOD_PER_POP;
 
   return {
     housing, workNeeded, employed, scale,
-    foodProd: effFood, woodRate: effWood, stoneRate: effStone,
+    foodProd: effFood, woodRate: effWood, stoneRate: effStone, hidesRate,
     consume, netFood: effFood - consume, passFood,
-    bldgBreakdown, rawFood, rawWood, rawStone,
+    bldgBreakdown, rawFood, rawWood, rawStone, rawHides,
   };
 }
 
@@ -232,7 +258,7 @@ export function doTick(st) {
   food  = Math.min(food,  caps.food);
   wood  = Math.min(wood,  caps.wood);
   stone = Math.min(stone, caps.stone);
-  let hides = Math.min(Math.max(0, f1(res.hides)), caps.hides); // hides production comes in Task 2
+  let hides = Math.min(Math.max(0, f1(res.hides + s.hidesRate)), caps.hides);
 
   // Drought
   let da = drought.active, dt = drought.ticks, famine = false;
