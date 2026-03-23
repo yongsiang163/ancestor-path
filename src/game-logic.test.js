@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { initState, doTick, calcStats } from './game-logic.js';
+import { initState, doTick, calcStats, DEFAULT_CAPS, calcCaps } from './game-logic.js';
 
 describe('initState', () => {
   it('starts with 4 pop and correct resources', () => {
@@ -30,5 +30,33 @@ describe('doTick', () => {
     const st = initState();
     const next = doTick(st);
     expect(next.tick).toBe(1);
+  });
+});
+
+describe('storage caps', () => {
+  it('exports DEFAULT_CAPS with correct values', () => {
+    expect(DEFAULT_CAPS.food).toBe(80);
+    expect(DEFAULT_CAPS.wood).toBe(100);
+    expect(DEFAULT_CAPS.stone).toBe(100);
+    expect(DEFAULT_CAPS.hides).toBe(40);
+  });
+
+  it('calcCaps returns defaults when no granary/warehouse on grid', () => {
+    const st = initState();
+    const caps = calcCaps(st.grid);
+    expect(caps.food).toBe(DEFAULT_CAPS.food);
+    expect(caps.wood).toBe(DEFAULT_CAPS.wood);
+    expect(caps.stone).toBe(DEFAULT_CAPS.stone);
+  });
+
+  it('doTick caps food at DEFAULT_CAPS.food when overfull', () => {
+    const st = { ...initState(), res: { food: 200, wood: 50, stone: 50, hides: 0 } };
+    const next = doTick(st);
+    expect(next.res.food).toBeLessThanOrEqual(DEFAULT_CAPS.food);
+  });
+
+  it('initState includes hides: 0 in res', () => {
+    const st = initState();
+    expect(st.res.hides).toBe(0);
   });
 });

@@ -7,6 +7,7 @@
 //  CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════════
 export const GW = 20, GH = 13, MAX_LVL = 3, BASE_HOUSING = 4;
+export const DEFAULT_CAPS = { food: 80, wood: 100, stone: 100, hides: 40 };
 export const TICK_MS = 1300, DAY_MS = 480_000, MAX_LOG = 20;
 export const DROUGHT_FOOD = 10, DROUGHT_LEN = 15, FOOD_PER_POP = 0.25;
 export const TILE_PX = 34;
@@ -143,6 +144,23 @@ export function mkNodes() {
   return nodes;
 }
 
+export function calcCaps(grid) {
+  let food = DEFAULT_CAPS.food, wood = DEFAULT_CAPS.wood,
+      stone = DEFAULT_CAPS.stone, hides = DEFAULT_CAPS.hides;
+  for (let r = 0; r < GH; r++) {
+    for (let c = 0; c < GW; c++) {
+      const cell = grid[r][c]; if (!cell) continue;
+      if (cell.id === 'granary')   food  += 60 * LV_MULT[cell.level - 1];
+      if (cell.id === 'warehouse') {
+        wood  += 80 * LV_MULT[cell.level - 1];
+        stone += 80 * LV_MULT[cell.level - 1];
+        hides += 60 * LV_MULT[cell.level - 1];
+      }
+    }
+  }
+  return { food: Math.ceil(food), wood: Math.ceil(wood), stone: Math.ceil(stone), hides: Math.ceil(hides) };
+}
+
 // Aggregate stats + per-building breakdown
 export function calcStats(st) {
   let housing = BASE_HOUSING, workNeeded = 0;
@@ -209,6 +227,13 @@ export function doTick(st) {
   let wood  = Math.max(0, f1(res.wood  + s.woodRate));
   let stone = Math.max(0, f1(res.stone + s.stoneRate));
 
+  // Apply storage caps
+  const caps = calcCaps(st.grid);
+  food  = Math.min(food,  caps.food);
+  wood  = Math.min(wood,  caps.wood);
+  stone = Math.min(stone, caps.stone);
+  let hides = Math.min(f1(res.hides), caps.hides); // hides production comes in Task 2
+
   // Drought
   let da = drought.active, dt = drought.ticks, famine = false;
   if (da) { dt--; if (dt <= 0) { da=false; dt=0; famine=true; L=logPush(L,"☀️ Drought breaks… famine follows."); } }
@@ -225,7 +250,7 @@ export function doTick(st) {
   if (wood >100&&res.wood <=100) L=logPush(L,"🪵 Lumber stores overflow!");
   if (stone>100&&res.stone<=100) L=logPush(L,"🪨 Stone reserves grow immense!");
 
-  return { ...st, res:{food,wood,stone}, pop:p, log:L, nodes, drought:{active:da,ticks:dt}, tick:t+1 };
+  return { ...st, res:{food,wood,stone,hides}, pop:p, log:L, nodes, drought:{active:da,ticks:dt}, tick:t+1 };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -324,7 +349,7 @@ export function reducer(st, a) {
 export function initState() {
   const tech = Object.fromEntries(Object.keys(TECH).map(k => [k, false]));
   return {
-    res: { food:30, wood:15, stone:8 },
+    res: { food:30, wood:15, stone:8, hides:0 },
     pop: 4, grid: mkGrid(), nodes: mkNodes(), log: [
       "🌅 A new age dawns upon the land…",
       "🌳 Click trees, rocks, berries & deer to gather resources!",
