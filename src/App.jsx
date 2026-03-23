@@ -1,5 +1,5 @@
 import { useState, useEffect, useReducer, useRef, useCallback } from "react";
-import { GW, GH, MAX_LVL, BASE_HOUSING, TICK_MS, DAY_MS, MAX_LOG, DROUGHT_FOOD, DROUGHT_LEN, FOOD_PER_POP, TILE_PX, LV_MULT, LV_XWORK, LV_ROM, NODE_DEF, NODE_POOL, BLDG, TECH_GROUPS, TECH, f1, sign, logPush, nodeKey, upgCost, bldgWorkers, bldgRate, bldgHousing, mkGrid, mkNodes, calcStats, doTick, reducer, initState, calcDayNight } from './game-logic.js';
+import { GW, GH, MAX_LVL, TICK_MS, DAY_MS, DROUGHT_FOOD, TILE_PX, LV_MULT, LV_XWORK, LV_ROM, NODE_DEF, BLDG, TECH_GROUPS, TECH, f1, sign, nodeKey, upgCost, bldgWorkers, bldgRate, bldgHousing, calcStats, reducer, initState, calcDayNight } from './game-logic.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  SUB-COMPONENTS
@@ -69,7 +69,7 @@ function BldgBtn({ id, b, selected, canAfford, locked, onClick }) {
 }
 
 function TechBtn({ id, tech, done, canAfford, onResearch }) {
-  const isUnlock = tech.group==="unlock";
+  const isUnlock = tech.group===TECH_GROUPS[0];
   return (
     <button onClick={onResearch} disabled={done} style={{
       width:"100%", textAlign:"left", padding:"5px 7px", marginBottom:2,
@@ -392,20 +392,17 @@ export default function App() {
 
           <div style={{ height:1, background:"#2A1808", margin:"8px 0 7px" }} />
 
-          {/* RESEARCH — two groups */}
-          <PH>Research — Unlocks</PH>
-          {Object.entries(TECH).filter(([,t])=>t.group==="unlock").map(([id,tech_]) => (
-            <TechBtn key={id} id={id} tech={tech_} done={tech[id]}
-                     canAfford={res.wood>=tech_.cw&&res.stone>=tech_.cs}
-                     onResearch={()=>dispatch({type:"RESEARCH",id})} />
-          ))}
-
-          <div style={{ height:1, background:"#2A1808", margin:"7px 0 6px" }} />
-          <PH>Research — Mastery</PH>
-          {Object.entries(TECH).filter(([,t])=>t.group==="mastery").map(([id,tech_]) => (
-            <TechBtn key={id} id={id} tech={tech_} done={tech[id]}
-                     canAfford={res.wood>=tech_.cw&&res.stone>=tech_.cs}
-                     onResearch={()=>dispatch({type:"RESEARCH",id})} />
+          {/* RESEARCH — iterate over TECH_GROUPS so adding a new group only requires updating the constant */}
+          {TECH_GROUPS.map((group, gi) => (
+            <div key={group}>
+              {gi > 0 && <div style={{ height:1, background:"#2A1808", margin:"7px 0 6px" }} />}
+              <PH>Research — {group.charAt(0).toUpperCase()+group.slice(1)}</PH>
+              {Object.entries(TECH).filter(([,t])=>t.group===group).map(([id,tech_]) => (
+                <TechBtn key={id} id={id} tech={tech_} done={tech[id]}
+                         canAfford={res.wood>=tech_.cw&&res.stone>=tech_.cs}
+                         onResearch={()=>dispatch({type:"RESEARCH",id})} />
+              ))}
+            </div>
           ))}
 
           <div style={{ height:1, background:"#2A1808", margin:"7px 0 6px" }} />

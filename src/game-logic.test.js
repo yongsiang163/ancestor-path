@@ -15,13 +15,13 @@ describe('calcStats', () => {
   it('returns housing >= BASE_HOUSING with starter buildings', () => {
     const st = initState();
     const s = calcStats(st);
-    expect(s.housing).toBeGreaterThanOrEqual(4);
+    expect(s.housing).toBeGreaterThan(4);
   });
 
   it('returns non-negative food production with bonfire', () => {
     const st = initState();
     const s = calcStats(st);
-    expect(s.foodProd).toBeGreaterThanOrEqual(0);
+    expect(s.foodProd).toBeGreaterThan(0);
   });
 });
 
