@@ -203,12 +203,13 @@ export function calcStats(st) {
       rawWood    += bldgRate(b, "wood",  level);
       rawStone   += bldgRate(b, "stone", level);
       rawHides   += (b.hides || 0) * LV_MULT[level - 1];
-      if (!bldgBreakdown[id]) bldgBreakdown[id] = { count:0, workers:0, food:0, wood:0, stone:0, housing:0, levels:[] };
+      if (!bldgBreakdown[id]) bldgBreakdown[id] = { count:0, workers:0, food:0, wood:0, stone:0, hides:0, housing:0, levels:[] };
       bldgBreakdown[id].count++;
       bldgBreakdown[id].workers += w;
       bldgBreakdown[id].food    += bldgRate(b,"food",level);
       bldgBreakdown[id].wood    += bldgRate(b,"wood",level);
       bldgBreakdown[id].stone   += bldgRate(b,"stone",level);
+      bldgBreakdown[id].hides   += (b.hides || 0) * LV_MULT[level - 1];
       bldgBreakdown[id].housing += bldgHousing(b,level);
       bldgBreakdown[id].levels.push(level);
     }
@@ -333,7 +334,9 @@ export function reducer(st, a) {
       const prodLabel=b.food>0?`+${f1(bldgRate(b,"food",toLvl))}🍖/t`
         :b.wood>0?`+${f1(bldgRate(b,"wood",toLvl))}🪵/t`
         :b.stone>0?`+${f1(bldgRate(b,"stone",toLvl))}🪨/t`
-        :b.housing>0?`+${bldgHousing(b,toLvl)} housing`:"";
+        :b.housing>0?`+${bldgHousing(b,toLvl)} housing`
+        :b.hides>0?`+${f1(b.hides * LV_MULT[toLvl-1])}🪶/t`
+        :"";
       return {...st,grid:g,res:{...st.res,wood:st.res.wood-cost.cw,stone:st.res.stone-cost.cs},
               log:logPush(st.log,`⬆️ ${b.name} → Level ${LV_ROM[toLvl-1]} · ${prodLabel} · 👷${newW} workers`)};
     }

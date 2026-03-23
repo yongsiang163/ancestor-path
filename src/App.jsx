@@ -61,6 +61,7 @@ function BldgBtn({ id, b, selected, canAfford, locked, onClick }) {
         {b.food>0&&<span style={{ color:"#72E472" }}>+{b.food}🍖/t </span>}
         {b.wood>0&&<span style={{ color:"#72E472" }}>+{b.wood}🪵/t </span>}
         {b.stone>0&&<span style={{ color:"#72E472" }}>+{b.stone}🪨/t </span>}
+        {b.hides>0&&<span style={{ color:"#72E472" }}>🪶+{b.hides}/t </span>}
         {b.workers>0&&<span style={{ color:"#7A6050" }}>👷{b.workers}</span>}
         {locked&&<span style={{ color:"#5A3010" }}> — research needed</span>}
       </div>
@@ -120,6 +121,7 @@ function BldgRow({ id, bd, scale, masonry }) {
         {bd.food >0&&<span style={{ color:"#72E472" }}>🍖+{scaledFood}/t</span>}
         {bd.wood >0&&<span style={{ color:"#72E472" }}>🪵+{scaledWood}/t</span>}
         {bd.stone>0&&<span style={{ color:"#72E472" }}>🪨+{scaledStone}/t</span>}
+        {bd.hides>0&&<span>🪶+{f1(bd.hides * scale)}/t </span>}
         {bd.housing>0&&<span style={{ color:"#8AB0D8" }}>🏠{bd.housing} cap</span>}
       </div>
     </div>
