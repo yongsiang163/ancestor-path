@@ -825,9 +825,16 @@ export default function App() {
             {log.map((entry,i) => (
               <div key={i} style={{
                 padding:"4px 0", borderBottom:"1px solid #120C04",
-                fontSize:10.5, lineHeight:1.45,
-                color: i===0?"#F0A850":`rgba(196,124,42,${Math.max(0.09,1-i*0.046)})`,
-                fontFamily:"'Crimson Text',serif",
+                lineHeight:1.45,
+                color: entry.startsWith("LOG") || entry.startsWith("ENKI") || entry.startsWith("//")
+                  ? `rgba(158,239,208,${Math.max(0.12, 1 - i * 0.05)})`
+                  : `rgba(196,124,42,${Math.max(0.09, 1 - i * 0.046)})`,
+                fontFamily: entry.startsWith("LOG") || entry.startsWith("ENKI") || entry.startsWith("//")
+                  ? "'Courier New', monospace"
+                  : "'Crimson Text', serif",
+                fontSize: entry.startsWith("LOG") || entry.startsWith("ENKI") || entry.startsWith("//")
+                  ? 9.5
+                  : 10.5,
               }}>{entry}</div>
             ))}
           </div>

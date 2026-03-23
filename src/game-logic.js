@@ -445,14 +445,14 @@ export function doTick(st) {
 
   // Population
   let p = pop;
-  if (famine) { p=Math.max(1,Math.ceil(p*0.9)); if (p<pop) L=logPush(L,`☠️ FAMINE — population: ${p}!`); }
-  else if (food===0 && p>1 && t%3===0) { p--; L=logPush(L,`💀 Starvation! Pop: ${p}`); }
-  else if (food>0 && p<s.housing && t%5===0) { p++; L=logPush(L,`👶 New settler! Pop: ${p}`); }
+  if (famine) { p=Math.max(1,Math.ceil(p*0.9)); if (p<pop) L=logPush(L,`LOG-CRITICAL: FAMINE. Population reduced to ${p}. Stress-testing survival threshold.`); }
+  else if (food===0 && p>1 && t%3===0) { p--; L=logPush(L,`LOG-WARNING: Starvation event. Population: ${p}. This DNA path is under stress.`); }
+  else if (food>0 && p<s.housing && t%5===0) { p++; L=logPush(L,`LOG: Population +1. Settlement: ${p}. Genomic viability increasing.`); }
 
-  if (p!==pop && p===10) L=logPush(L,"🏛️ A growing tribe — 10 souls!");
-  if (p!==pop && p===20) L=logPush(L,"⚔️ Settlement swells to 20!");
-  if (wood >100&&res.wood <=100) L=logPush(L,"🪵 Lumber stores overflow!");
-  if (stone>100&&res.stone<=100) L=logPush(L,"🪨 Stone reserves grow immense!");
+  if (p!==pop && p===10) L=logPush(L,"LOG: Settlement reaches 10 souls. Tier 1 viability score: RISING.");
+  if (p!==pop && p===20) L=logPush(L,"LOG: 20 settlers. The DNA path is stabilising.");
+  if (wood >100&&res.wood <=100) L=logPush(L,"LOG: Wood reserves exceed baseline. Storage expansion recommended.");
+  if (stone>100&&res.stone<=100) L=logPush(L,"LOG: Stone reserves exceed baseline. Quarry efficiency noted.");
 
   // ── Night Market ──────────────────────────────────────────────────────────
   const coverage = calcGenomicCoverage(st);
@@ -657,11 +657,11 @@ export function initState() {
   return {
     res: { food:30, wood:15, stone:8, hides:0 },
     pop: 4, grid: mkGrid(), nodes: mkNodes(), log: [
-      "🌅 A new age dawns upon the land…",
-      "🌳 Click trees, rocks, berries & deer to gather resources!",
-      "🏗️ Build mode: place buildings on empty tiles.",
-      "⬆️ Upgrade mode: click a building to level it up.",
-      "💡 Higher levels need more workers but produce much more!",
+      "ENKI-PROTOCOL // SIMULATION_INIT // TIER_1 // ITERATION_[UNKNOWN]",
+      "The DNA sample is 12,000 years old. It remembers a winter that should have ended us.",
+      "Six people. A clearing. Tools. A fire that is not yet lit.",
+      "LOG-0001: Hut construction detected. Shelter archetype — present in 100% of viable DNA paths.",
+      "// Click trees, rocks, berries to gather. Build. Research. Survive. //",
     ],
     tech, drought:{active:false,ticks:0},
     tick:0, paused:false, speed:1, sel:"hut",
