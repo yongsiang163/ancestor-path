@@ -17,6 +17,23 @@ export const LV_XWORK = [0,   1,    2  ];   // bonus workers added per level
 export const LV_ROM   = ["Ⅰ","Ⅱ","Ⅲ"];
 
 // ═══════════════════════════════════════════════════════════════════════════
+//  POPULATION ROLES
+// ═══════════════════════════════════════════════════════════════════════════
+export const ROLES = {
+  gatherer:  { name:"Gatherer",   icon:"🧺", works:["bonfire","berryFarm","fishery"],    bonus:"food",  mult:1.10 },
+  woodcutter:{ name:"Woodcutter", icon:"🪓", works:["woodCamp","forester"],              bonus:"wood",  mult:1.10 },
+  mason:     { name:"Mason",      icon:"⛏️",  works:["quarry","granary","warehouse"],     bonus:"stone", mult:1.10 },
+  hunter:    { name:"Hunter",     icon:"🏹", works:["hunt","tanningHut"],                bonus:"food",  mult:1.15 },
+  shaman:    { name:"Shaman",     icon:"🔮", works:["ritualCircle","eldersLodge"],       bonus:null,    mult:1.0  },
+};
+
+// Reverse lookup: building id → preferred role key
+export const BLDG_ROLE = Object.entries(ROLES).reduce((acc, [role, def]) => {
+  def.works.forEach(bId => { acc[bId] = role; });
+  return acc;
+}, {});
+
+// ═══════════════════════════════════════════════════════════════════════════
 //  NATURAL RESOURCE NODES
 // ═══════════════════════════════════════════════════════════════════════════
 export const NODE_DEF = {
@@ -222,49 +239,75 @@ export function calcCaps(grid, tech = {}) {
 export function calcStats(st) {
   let housing = BASE_HOUSING, workNeeded = 0;
   let rawFood = 0, rawWood = 0, rawStone = 0, rawHides = 0;
-  const bldgBreakdown = {}; // id → { count, workers, food, wood, stone, housing }
+  const bldgBreakdown = {};
+
+  // Mutable copy of role pools
+  const rolePool = { ...(st.roles || { gatherer:0, woodcutter:0, mason:0, hunter:0, shaman:0 }) };
+  // Idle settlers (not assigned to any role) — they can fill any role at 50% efficiency
+  const totalAssigned = Object.values(rolePool).reduce((a, b) => a + b, 0);
+  let idlePool = Math.max(0, st.pop - totalAssigned);
 
   for (let r = 0; r < GH; r++) {
     for (let c = 0; c < GW; c++) {
       const cell = st.grid[r][c]; if (!cell) continue;
       const { id, level } = cell;
-      const b = BLDG[id];
-      const w = bldgWorkers(b, level);
-      housing    += bldgHousing(b, level);
-      workNeeded += w;
-      rawFood    += bldgRate(b, "food",  level);
-      rawWood    += bldgRate(b, "wood",  level);
-      rawStone   += bldgRate(b, "stone", level);
-      rawHides   += (b.hides || 0) * LV_MULT[level - 1];
+      const b = BLDG[id]; if (!b) continue;
+      const needWorkers = bldgWorkers(b, level);
+      const preferredRole = BLDG_ROLE[id];
+      workNeeded += needWorkers;
+      housing += bldgHousing(b, level);
+
+      // Staff building: preferred role first, then idle at 50% efficiency
+      let staffedPref = 0, staffedIdle = 0;
+      if (needWorkers > 0 && preferredRole && rolePool[preferredRole] > 0) {
+        staffedPref = Math.min(rolePool[preferredRole], needWorkers);
+        rolePool[preferredRole] -= staffedPref;
+      }
+      const remaining = needWorkers - staffedPref;
+      if (remaining > 0 && idlePool > 0) {
+        staffedIdle = Math.min(idlePool, remaining);
+        idlePool -= staffedIdle;
+      }
+
+      const efficiency = needWorkers > 0
+        ? (staffedPref * (ROLES[preferredRole]?.mult || 1.0) + staffedIdle * 0.5) / needWorkers
+        : 1.0;
+
+      rawFood  += bldgRate(b, "food",  level) * efficiency;
+      rawWood  += bldgRate(b, "wood",  level) * efficiency;
+      rawStone += bldgRate(b, "stone", level) * efficiency;
+      rawHides += (b.hides || 0) * LV_MULT[level - 1] * efficiency;
+
       if (!bldgBreakdown[id]) bldgBreakdown[id] = { count:0, workers:0, food:0, wood:0, stone:0, hides:0, housing:0, levels:[] };
       bldgBreakdown[id].count++;
-      bldgBreakdown[id].workers += w;
-      bldgBreakdown[id].food    += bldgRate(b,"food",level);
-      bldgBreakdown[id].wood    += bldgRate(b,"wood",level);
-      bldgBreakdown[id].stone   += bldgRate(b,"stone",level);
-      bldgBreakdown[id].hides   += (b.hides || 0) * LV_MULT[level - 1];
-      bldgBreakdown[id].housing += bldgHousing(b,level);
+      bldgBreakdown[id].workers  += needWorkers;
+      bldgBreakdown[id].food     += bldgRate(b,"food",level)   * efficiency;
+      bldgBreakdown[id].wood     += bldgRate(b,"wood",level)   * efficiency;
+      bldgBreakdown[id].stone    += bldgRate(b,"stone",level)  * efficiency;
+      bldgBreakdown[id].hides    += (b.hides||0) * LV_MULT[level-1] * efficiency;
+      bldgBreakdown[id].housing  += bldgHousing(b,level);
       bldgBreakdown[id].levels.push(level);
     }
   }
 
-  const employed  = Math.min(st.pop, workNeeded);
-  const scale     = workNeeded > 0 ? employed / workNeeded : 0;
-  const dMult     = st.drought.active ? 0.5 : 1.0;
-  const tMult     = st.tech.toolCrafting ? 1.25 : 1.0;
-  const hideMult  = st.tech.hideTanning ? 1.5 : 1.0;
-  const passFood  = st.tech.animalHusbandry ? 2 : 0;
-  const effFood   = rawFood  * scale * dMult * tMult + passFood;
-  const effWood   = rawWood  * scale * tMult;
-  const effStone  = rawStone * scale * tMult;
-  const hidesRate = rawHides * scale * tMult * hideMult;
-  const consume   = st.pop * FOOD_PER_POP;
+  const employed   = st.pop - idlePool;  // workers actually working
+  const scale      = workNeeded > 0 ? Math.min(1, employed / workNeeded) : 0;
+  const dMult      = (st.drought?.active) ? 0.5 : 1.0;
+  const tMult      = st.tech?.toolCrafting ? 1.25 : 1.0;
+  const hideMult   = st.tech?.hideTanning  ? 1.5  : 1.0;
+  const passFood   = st.tech?.animalHusbandry ? 2 : 0;
+
+  const effFood    = rawFood  * dMult * tMult + passFood;
+  const effWood    = rawWood  * tMult;
+  const effStone   = rawStone * tMult;
+  const hidesRate  = rawHides * tMult * hideMult;
+  const consume    = st.pop * FOOD_PER_POP;
 
   return {
     housing, workNeeded, employed, scale,
     foodProd: effFood, woodRate: effWood, stoneRate: effStone, hidesRate,
     consume, netFood: effFood - consume, passFood,
-    bldgBreakdown, rawFood, rawWood, rawStone, rawHides,
+    bldgBreakdown, rawFood, rawWood, rawStone,
   };
 }
 
@@ -312,7 +355,21 @@ export function doTick(st) {
   if (wood >100&&res.wood <=100) L=logPush(L,"🪵 Lumber stores overflow!");
   if (stone>100&&res.stone<=100) L=logPush(L,"🪨 Stone reserves grow immense!");
 
-  return { ...st, res:{food,wood,stone,hides}, pop:p, log:L, nodes, drought:{active:da,ticks:dt}, tick:t+1 };
+  // Genetic marker accumulation every 10 ticks
+  let markers = st.markers || { combatReflex: 0, orichalcumTuning: 0, systemCoherence: 0 };
+  if (t % 10 === 0 && st.pop > 0) {
+    const roles = st.roles || {};
+    const hunterFrac  = (roles.hunter  || 0) / st.pop;
+    const builderFrac = ((roles.mason  || 0) + (roles.woodcutter || 0)) / st.pop;
+    const shamanFrac  = (roles.shaman  || 0) / st.pop;
+    markers = {
+      combatReflex:     f1(markers.combatReflex     + (hunterFrac  > 0.3 ? 0.1 : 0)),
+      orichalcumTuning: f1(markers.orichalcumTuning + (builderFrac > 0.4 ? 0.1 : 0)),
+      systemCoherence:  f1(markers.systemCoherence  + (shamanFrac  > 0.1 ? 0.1 : 0)),
+    };
+  }
+
+  return { ...st, res:{food,wood,stone,hides}, pop:p, log:L, nodes, drought:{active:da,ticks:dt}, tick:t+1, markers };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -427,6 +484,28 @@ export function reducer(st, a) {
       };
     }
 
+    case "SET_ROLE": {
+      if (a.delta === 0) return st;
+      const newVal = Math.max(0, (st.roles[a.role] || 0) + a.delta);
+      let newRoles = { ...st.roles, [a.role]: newVal };
+      let total = Object.values(newRoles).reduce((x, y) => x + y, 0);
+      // If total exceeds pop, clamp by reducing other roles (largest first)
+      while (total > st.pop) {
+        const others = Object.entries(newRoles)
+          .filter(([k, v]) => k !== a.role && v > 0)
+          .sort((x, y) => y[1] - x[1]);
+        if (!others.length) {
+          // Can't reduce others — cap the target role itself
+          newRoles = { ...newRoles, [a.role]: Math.max(0, newRoles[a.role] - (total - st.pop)) };
+          break;
+        }
+        const [reduceKey] = others[0];
+        newRoles = { ...newRoles, [reduceKey]: newRoles[reduceKey] - 1 };
+        total--;
+      }
+      return { ...st, roles: newRoles };
+    }
+
     case "NEW_GAME": return initState();
     default: return st;
   }
@@ -445,6 +524,8 @@ export function initState() {
     ],
     tech, drought:{active:false,ticks:0},
     tick:0, paused:false, speed:1, sel:"hut",
+    roles:   { gatherer: 2, woodcutter: 1, mason: 1, hunter: 0, shaman: 0 },
+    markers: { combatReflex: 0, orichalcumTuning: 0, systemCoherence: 0 },
   };
 }
 

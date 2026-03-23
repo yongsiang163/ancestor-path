@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { initState, doTick, calcStats, DEFAULT_CAPS, calcCaps, reducer, BLDG, TECH_GROUPS, TECH } from './game-logic.js';
+import { initState, doTick, calcStats, DEFAULT_CAPS, calcCaps, reducer, BLDG, TECH_GROUPS, TECH, ROLES, BLDG_ROLE } from './game-logic.js';
 
 describe('initState', () => {
   it('starts with 4 pop and correct resources', () => {
@@ -148,5 +148,52 @@ describe('tech tree', () => {
     const next = reducer(st, { type:'RESEARCH', id:'ancestorWorship' });
     expect(next.tech.ancestorWorship).toBe(false); // blocked — no ritualCircle on grid
     expect(next.log[0]).toMatch(/requires/i);
+  });
+});
+
+describe('population roles', () => {
+  it('exports 5 ROLES: gatherer, woodcutter, mason, hunter, shaman', () => {
+    expect(Object.keys(ROLES).length).toBe(5);
+    expect(ROLES).toHaveProperty('gatherer');
+    expect(ROLES).toHaveProperty('woodcutter');
+    expect(ROLES).toHaveProperty('mason');
+    expect(ROLES).toHaveProperty('hunter');
+    expect(ROLES).toHaveProperty('shaman');
+  });
+
+  it('initState includes roles summing to pop', () => {
+    const st = initState();
+    const total = Object.values(st.roles).reduce((a, b) => a + b, 0);
+    expect(total).toBe(st.pop);
+  });
+
+  it('initState includes markers with all three keys', () => {
+    const st = initState();
+    expect(st.markers).toHaveProperty('combatReflex');
+    expect(st.markers).toHaveProperty('orichalcumTuning');
+    expect(st.markers).toHaveProperty('systemCoherence');
+  });
+
+  it('SET_ROLE increases a role count', () => {
+    const st = initState();
+    const next = reducer(st, { type: 'SET_ROLE', role: 'hunter', delta: 1 });
+    expect(next.roles.hunter).toBe(st.roles.hunter + 1);
+  });
+
+  it('SET_ROLE prevents total roles exceeding pop', () => {
+    const st = initState();
+    // Try to assign all 4 pop to hunter (pop is 4, so 5th would exceed)
+    let s = reducer(st, { type: 'SET_ROLE', role: 'hunter', delta: 4 });
+    const total = Object.values(s.roles).reduce((a, b) => a + b, 0);
+    expect(total).toBeLessThanOrEqual(s.pop);
+  });
+
+  it('hunter-dominant play accumulates Combat Reflex marker over ticks', () => {
+    let st = initState();
+    // Assign all pop to hunter
+    st = { ...st, roles: { gatherer:0, woodcutter:0, mason:0, hunter:st.pop, shaman:0 } };
+    // Run 10 ticks
+    for (let i = 0; i < 10; i++) st = { ...doTick(st), tick: st.tick + 1 };
+    expect(st.markers.combatReflex).toBeGreaterThan(0);
   });
 });
