@@ -232,7 +232,7 @@ export function doTick(st) {
   food  = Math.min(food,  caps.food);
   wood  = Math.min(wood,  caps.wood);
   stone = Math.min(stone, caps.stone);
-  let hides = Math.min(f1(res.hides), caps.hides); // hides production comes in Task 2
+  let hides = Math.min(Math.max(0, f1(res.hides)), caps.hides); // hides production comes in Task 2
 
   // Drought
   let da = drought.active, dt = drought.ticks, famine = false;
@@ -274,7 +274,7 @@ export function reducer(st, a) {
         ?`${def.icon} ${def.label} depleted — ${parts.join(" ")} (respawns ~${def.respawn}t)`
         :`${def.icon} ${def.verb}! ${parts.join(" ")} — ${newCh} charge${newCh!==1?"s":""} left`;
       return { ...st, nodes, log:logPush(st.log,msg),
-               res:{food:f1(st.res.food+def.food), wood:f1(st.res.wood+def.wood), stone:f1(st.res.stone+def.stone)} };
+               res:{...st.res, food:f1(st.res.food+def.food), wood:f1(st.res.wood+def.wood), stone:f1(st.res.stone+def.stone)} };
     }
 
     // ── Place building (or gather if live node) ───────────────────────────

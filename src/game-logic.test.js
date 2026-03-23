@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { initState, doTick, calcStats, DEFAULT_CAPS, calcCaps } from './game-logic.js';
+import { initState, doTick, calcStats, DEFAULT_CAPS, calcCaps, reducer } from './game-logic.js';
 
 describe('initState', () => {
   it('starts with 4 pop and correct resources', () => {
@@ -58,5 +58,16 @@ describe('storage caps', () => {
   it('initState includes hides: 0 in res', () => {
     const st = initState();
     expect(st.res.hides).toBe(0);
+  });
+});
+
+describe('GATHER action', () => {
+  it('GATHER action preserves hides in res', () => {
+    const st = { ...initState(), res: { food: 30, wood: 15, stone: 8, hides: 5 } };
+    // Find a node to gather from
+    const nodeKey = Object.keys(st.nodes)[0];
+    const [r, c] = nodeKey.split(',').map(Number);
+    const next = reducer(st, { type: 'GATHER', r, c });
+    expect(next.res.hides).toBe(5); // hides unchanged by a gather
   });
 });
