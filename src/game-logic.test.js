@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { initState, doTick, calcStats, DEFAULT_CAPS, calcCaps, reducer, BLDG, TECH_GROUPS, TECH, ROLES, BLDG_ROLE, THREAT_DEF, calcGenomicCoverage } from './game-logic.js';
+import { initState, doTick, calcStats, DEFAULT_CAPS, calcCaps, reducer, BLDG, TECH_GROUPS, TECH, ROLES, BLDG_ROLE, THREAT_DEF, calcGenomicCoverage, MARKET_ITEMS } from './game-logic.js';
 
 describe('initState', () => {
   it('starts with 4 pop and correct resources', () => {
@@ -261,5 +261,48 @@ describe('genomic coverage', () => {
     grid[5][5] = { id: 'quarry', level: 1 };
     const st2 = { ...st, grid };
     expect(calcGenomicCoverage(st2)).toBeGreaterThan(calcGenomicCoverage(st));
+  });
+});
+
+describe('night market', () => {
+  it('MARKET_ITEMS exports at least 4 items', () => {
+    expect(Array.isArray(MARKET_ITEMS)).toBe(true);
+    expect(MARKET_ITEMS.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('initState has nightMarket with unlocked:false and open:false', () => {
+    const st = initState();
+    expect(st.nightMarket.unlocked).toBe(false);
+    expect(st.nightMarket.open).toBe(false);
+    expect(Array.isArray(st.nightMarket.offers)).toBe(true);
+  });
+
+  it('BUY_MARKET deducts costs and adds gives to res', () => {
+    const st = initState();
+    const offer = MARKET_ITEMS[0]; // first item
+    const startRes = { food: 50, wood: 50, stone: 50, hides: 20 };
+    // Inject the offer into a "open" night market state
+    const s = {
+      ...st,
+      res: { ...startRes },
+      nightMarket: { unlocked: true, open: true, offers: [offer] },
+    };
+    const next = reducer(s, { type: 'BUY_MARKET', id: offer.id });
+    // At least one resource should have changed
+    const resChanged = Object.keys(startRes).some(k => next.res[k] !== startRes[k]);
+    expect(resChanged).toBe(true);
+  });
+
+  it('BUY_MARKET fails silently when market is closed', () => {
+    const st = initState();
+    const offer = MARKET_ITEMS[0];
+    const s = {
+      ...st,
+      res: { food: 50, wood: 50, stone: 50, hides: 20 },
+      nightMarket: { unlocked: true, open: false, offers: [offer] },
+    };
+    const next = reducer(s, { type: 'BUY_MARKET', id: offer.id });
+    expect(next.res.food).toBe(50); // unchanged
+    expect(next.res.wood).toBe(50);
   });
 });

@@ -1,5 +1,13 @@
 import { useState, useEffect, useReducer, useRef, useCallback } from "react";
-import { GW, GH, MAX_LVL, TICK_MS, DAY_MS, DROUGHT_FOOD, TILE_PX, LV_MULT, LV_XWORK, LV_ROM, NODE_DEF, BLDG, TECH_GROUPS, TECH, ROLES, f1, sign, nodeKey, upgCost, bldgWorkers, bldgRate, bldgHousing, calcStats, reducer, initState, calcDayNight, THREAT_DEF, calcGenomicCoverage } from './game-logic.js';
+import { GW, GH, MAX_LVL, TICK_MS, DAY_MS, DROUGHT_FOOD, TILE_PX, LV_MULT, LV_XWORK, LV_ROM, NODE_DEF, BLDG, TECH_GROUPS, TECH, ROLES, f1, sign, nodeKey, upgCost, bldgWorkers, bldgRate, bldgHousing, calcStats, reducer, initState, calcDayNight, THREAT_DEF, calcGenomicCoverage, MARKET_ITEMS } from './game-logic.js';
+
+// Resource metadata used by Night Market UI
+const RES_META = [
+  { k:"food",  e:"🍖", label:"Food"  },
+  { k:"wood",  e:"🪵", label:"Wood"  },
+  { k:"stone", e:"🪨", label:"Stone" },
+  { k:"hides", e:"🪶", label:"Hides" },
+];
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  SUB-COMPONENTS
@@ -725,6 +733,40 @@ export default function App() {
 
           {/* Genomic Coverage */}
           <CoverageMeter coverage={coverage} />
+
+          {/* Night Market */}
+          {st.nightMarket?.open && (
+            <div style={{ marginBottom:7, padding:"7px 9px",
+                          background:"rgba(10,0,30,0.75)", border:"1px solid #2A1A4A" }}>
+              <PH color="#9070D0">🌙 Night Market · Deep-Layer Exchange</PH>
+              {st.nightMarket.offers.map(offer => (
+                <button
+                  key={offer.id}
+                  onClick={() => dispatch({ type:"BUY_MARKET", id:offer.id })}
+                  style={{
+                    width:"100%", textAlign:"left", marginBottom:3, padding:"5px 7px",
+                    background:"#080618", border:"1px solid #2A1A4A",
+                    color:"#9070D0", cursor:"pointer", fontSize:9.5,
+                    fontFamily:"'Cinzel',serif", outline:"none",
+                    opacity: Object.entries(offer.costs).every(([k,v])=>(res[k]||0)>=v) ? 1 : 0.45,
+                  }}
+                >
+                  <span>{offer.icon} {offer.label}</span>
+                  <span style={{ float:"right", fontSize:8.5, color:"#6A5080" }}>
+                    {Object.entries(offer.costs).map(([k,v])=>`${RES_META.find(r=>r.k===k)?.e||k}${v}`).join(" ")}
+                    {" → "}
+                    {Object.entries(offer.gives).map(([k,v])=>`${RES_META.find(r=>r.k===k)?.e||k}${v}`).join(" ")}
+                  </span>
+                </button>
+              ))}
+              {tech?.orangBunianContact && (
+                <div style={{ fontSize:8, color:"#5A3A80", marginTop:3,
+                              fontFamily:"'Crimson Text',serif", fontStyle:"italic" }}>
+                  ✦ Rare artifacts available — Orang Bunian Contact active
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Tribe Panel */}
           <TribePanel

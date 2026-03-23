@@ -194,6 +194,30 @@ export const THREAT_DEF = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
+//  NIGHT MARKET
+// ═══════════════════════════════════════════════════════════════════════════
+export const MARKET_ITEMS = [
+  { id:"foodBundle",   label:"Salted Provisions",   icon:"🍖",
+    gives:{ food:20 },        costs:{ wood:15 } },
+  { id:"woodBundle",   label:"Timber Cache",         icon:"🪵",
+    gives:{ wood:20 },        costs:{ food:15 } },
+  { id:"stoneBundle",  label:"Quarried Blocks",      icon:"🪨",
+    gives:{ stone:20 },       costs:{ wood:12 } },
+  { id:"hidesBundle",  label:"Cured Hides",          icon:"🪶",
+    gives:{ hides:15 },       costs:{ food:10 } },
+  { id:"anunnakiShard",label:"Anunnaki Shard",        icon:"💠",
+    gives:{ hides:5, stone:5 }, costs:{ food:20, wood:10 },
+    rare: true,
+    enkiLog:"LOG: Artifact predates simulation timeline by 4,000 years. Flagged as Deep-Layer Exchange." },
+];
+
+function generateMarketOffers(tech) {
+  const pool = tech?.orangBunianContact ? MARKET_ITEMS : MARKET_ITEMS.slice(0, 4);
+  // Shuffle and pick 3
+  return [...pool].sort(() => Math.random() - 0.5).slice(0, 3);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 //  HELPERS
 // ═══════════════════════════════════════════════════════════════════════════
 export const f1      = n => (isNaN(n)||!isFinite(n)) ? 0 : Math.round(n * 10) / 10;
@@ -425,6 +449,25 @@ export function doTick(st) {
   if (wood >100&&res.wood <=100) L=logPush(L,"🪵 Lumber stores overflow!");
   if (stone>100&&res.stone<=100) L=logPush(L,"🪨 Stone reserves grow immense!");
 
+  // ── Night Market ──────────────────────────────────────────────────────────
+  const coverage = calcGenomicCoverage(st);
+  let nightMarket = st.nightMarket || { unlocked: false, open: false, offers: [] };
+
+  if (!nightMarket.unlocked && coverage >= 60) {
+    nightMarket = { ...nightMarket, unlocked: true };
+    L = logPush(L, "🌙 Night Market opens — the Enki Protocol surfaces deep-layer artifacts.");
+  }
+
+  if (nightMarket.unlocked) {
+    const nowOpen = isNight; // isNight already computed earlier in doTick
+    // Refresh offers when market transitions to open
+    if (nowOpen && !nightMarket.open) {
+      nightMarket = { ...nightMarket, open: true, offers: generateMarketOffers(st.tech) };
+    } else if (!nowOpen && nightMarket.open) {
+      nightMarket = { ...nightMarket, open: false };
+    }
+  }
+
   // Genetic marker accumulation every 10 ticks
   let markers = st.markers || { combatReflex: 0, orichalcumTuning: 0, systemCoherence: 0 };
   if (t % 10 === 0 && st.pop > 0) {
@@ -441,7 +484,7 @@ export function doTick(st) {
 
   return { ...st, res:{food,wood,stone,hides}, pop:p, log:L, nodes,
            drought:{active:da,ticks:dt}, tick:t+1,
-           threats, whisperActive, dayPhase, markers };
+           threats, whisperActive, dayPhase, markers, nightMarket };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -578,6 +621,25 @@ export function reducer(st, a) {
       return { ...st, roles: newRoles };
     }
 
+    case "BUY_MARKET": {
+      const nm = st.nightMarket;
+      if (!nm?.open) return st;
+      const offer = nm.offers.find(o => o.id === a.id);
+      if (!offer) return st;
+      // Check can afford
+      const canAfford = Object.entries(offer.costs).every(([k, v]) => (st.res[k] || 0) >= v);
+      if (!canAfford)
+        return { ...st, log: logPush(st.log, `❌ Cannot afford ${offer.label}`) };
+      // Apply transaction
+      const newRes = { ...st.res };
+      Object.entries(offer.costs).forEach(([k, v]) => { newRes[k] = f1(newRes[k] - v); });
+      Object.entries(offer.gives).forEach(([k, v]) => { newRes[k] = f1((newRes[k] || 0) + v); });
+      const msg = offer.enkiLog
+        ? `🌙 ${offer.label} acquired. ${offer.enkiLog}`
+        : `🌙 Night Market: traded for ${offer.label}.`;
+      return { ...st, res: newRes, log: logPush(st.log, msg) };
+    }
+
     case "NEW_GAME": return initState();
     default: return st;
   }
@@ -601,6 +663,7 @@ export function initState() {
     threats: [],           // [{ type: string, ticks: number }]
     whisperActive: false,  // true = efficiency halved this tick (from whisperStorm last tick)
     dayPhase: 0.5,         // 0=midnight, 0.5=noon, drives isNight check
+    nightMarket: { unlocked: false, open: false, offers: [] },
   };
 }
 
