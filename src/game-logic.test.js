@@ -279,7 +279,7 @@ describe('night market', () => {
 
   it('BUY_MARKET deducts costs and adds gives to res', () => {
     const st = initState();
-    const offer = MARKET_ITEMS[0]; // first item
+    const offer = MARKET_ITEMS[0]; // foodBundle: costs {wood:15}, gives {food:20}
     const startRes = { food: 50, wood: 50, stone: 50, hides: 20 };
     // Inject the offer into a "open" night market state
     const s = {
@@ -288,9 +288,9 @@ describe('night market', () => {
       nightMarket: { unlocked: true, open: true, offers: [offer] },
     };
     const next = reducer(s, { type: 'BUY_MARKET', id: offer.id });
-    // At least one resource should have changed
-    const resChanged = Object.keys(startRes).some(k => next.res[k] !== startRes[k]);
-    expect(resChanged).toBe(true);
+    // wood deducted by exact cost (15), food increased by exact gives amount (20)
+    expect(next.res.wood).toBe(startRes.wood - 15);
+    expect(next.res.food).toBe(startRes.food + 20);
   });
 
   it('BUY_MARKET fails silently when market is closed', () => {

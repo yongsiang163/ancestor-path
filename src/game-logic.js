@@ -213,8 +213,13 @@ export const MARKET_ITEMS = [
 
 function generateMarketOffers(tech) {
   const pool = tech?.orangBunianContact ? MARKET_ITEMS : MARKET_ITEMS.slice(0, 4);
-  // Shuffle and pick 3
-  return [...pool].sort(() => Math.random() - 0.5).slice(0, 3);
+  // Fisher-Yates shuffle
+  const arr = [...pool];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr.slice(0, 3);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -455,7 +460,7 @@ export function doTick(st) {
 
   if (!nightMarket.unlocked && coverage >= 60) {
     nightMarket = { ...nightMarket, unlocked: true };
-    L = logPush(L, "🌙 Night Market opens — the Enki Protocol surfaces deep-layer artifacts.");
+    L = logPush(L, "🌙 Night Market unlocked — opens at nightfall.");
   }
 
   if (nightMarket.unlocked) {
@@ -634,6 +639,8 @@ export function reducer(st, a) {
       const newRes = { ...st.res };
       Object.entries(offer.costs).forEach(([k, v]) => { newRes[k] = f1(newRes[k] - v); });
       Object.entries(offer.gives).forEach(([k, v]) => { newRes[k] = f1((newRes[k] || 0) + v); });
+      const caps = calcCaps(st.grid, st.tech);
+      Object.keys(offer.gives).forEach(k => { newRes[k] = Math.min(newRes[k], caps[k]); });
       const msg = offer.enkiLog
         ? `🌙 ${offer.label} acquired. ${offer.enkiLog}`
         : `🌙 Night Market: traded for ${offer.label}.`;
