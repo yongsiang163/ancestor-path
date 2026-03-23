@@ -425,7 +425,7 @@ export function doTick(st) {
       const alreadyActive = threats.some(th => th.type === type);
       if (!alreadyActive && Math.random() < (bomohActive ? def.spawnChance * 0.5 : def.spawnChance)) {
         threats.push({ type, ticks: def.duration });
-        L = logPush(L, `${def.icon} ${def.name} approaches! ${def.enkiLog}`);
+        L = logPush(L, `${def.enkiLog} [${def.name} detected]`);
       }
     });
   }
@@ -439,9 +439,9 @@ export function doTick(st) {
 
   // Drought
   let da = drought.active, dt = drought.ticks, famine = false;
-  if (da) { dt--; if (dt <= 0) { da=false; dt=0; famine=true; L=logPush(L,"☀️ Drought breaks… famine follows."); } }
+  if (da) { dt--; if (dt <= 0) { da=false; dt=0; famine=true; L=logPush(L,"LOG-CRITICAL: Drought ended. Caloric deficit critical. Famine threshold breached."); } }
   const droughtThreshold = st.tech.preservation ? Math.floor(DROUGHT_FOOD * 0.6) : DROUGHT_FOOD;
-  if (!da && food < droughtThreshold) { da=true; dt=DROUGHT_LEN; L=logPush(L,`🌵 DROUGHT! Food halved for ${DROUGHT_LEN} ticks!`); }
+  if (!da && food < droughtThreshold) { da=true; dt=DROUGHT_LEN; L=logPush(L,`LOG-WARNING: Drought event. Food production halved for ${DROUGHT_LEN} ticks. Genomic stress response active.`); }
 
   // Population
   let p = pop;
@@ -460,7 +460,7 @@ export function doTick(st) {
 
   if (!nightMarket.unlocked && coverage >= 60) {
     nightMarket = { ...nightMarket, unlocked: true };
-    L = logPush(L, "🌙 Night Market unlocked — opens at nightfall.");
+    L = logPush(L, "LOG: Night Market protocol active. Awaiting nightfall to open.");
   }
 
   if (nightMarket.unlocked) {
@@ -594,7 +594,7 @@ export function reducer(st, a) {
       if (st.res.wood < cw || st.res.stone < cs || st.res.hides < ch)
         return { ...st, log: logPush(st.log, `❌ Need 🪵${cw} 🪨${cs}${ch ? ` 🪶${ch}` : ""} for ${tech.name}`) };
       const msg = tech.enkiLog
-        ? `🔬 ${tech.name} decoded. ${tech.enkiLog}`
+        ? `${tech.enkiLog} [${tech.name} decoded]`
         : `🔬 ${tech.name} — ancestral pathway recovered.`;
       return {
         ...st,
@@ -642,7 +642,7 @@ export function reducer(st, a) {
       const caps = calcCaps(st.grid, st.tech);
       Object.keys(offer.gives).forEach(k => { newRes[k] = Math.min(newRes[k], caps[k]); });
       const msg = offer.enkiLog
-        ? `🌙 ${offer.label} acquired. ${offer.enkiLog}`
+        ? `${offer.enkiLog} [${offer.label} acquired]`
         : `🌙 Night Market: traded for ${offer.label}.`;
       return { ...st, res: newRes, log: logPush(st.log, msg) };
     }

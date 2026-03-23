@@ -822,21 +822,24 @@ export default function App() {
             background:"rgba(0,0,0,0.38)", border:"1px solid #1E1008",
             maxHeight:300, overflowY:"auto", padding:"5px 7px",
           }}>
-            {log.map((entry,i) => (
+            {log.map((entry,i) => {
+              const isProtocol = entry.startsWith("LOG") || entry.startsWith("ENKI") || entry.startsWith("//");
+              return (
               <div key={i} style={{
                 padding:"4px 0", borderBottom:"1px solid #120C04",
                 lineHeight:1.45,
-                color: entry.startsWith("LOG") || entry.startsWith("ENKI") || entry.startsWith("//")
+                color: isProtocol
                   ? `rgba(158,239,208,${Math.max(0.12, 1 - i * 0.05)})`
                   : `rgba(196,124,42,${Math.max(0.09, 1 - i * 0.046)})`,
-                fontFamily: entry.startsWith("LOG") || entry.startsWith("ENKI") || entry.startsWith("//")
+                fontFamily: isProtocol
                   ? "'Courier New', monospace"
                   : "'Crimson Text', serif",
-                fontSize: entry.startsWith("LOG") || entry.startsWith("ENKI") || entry.startsWith("//")
+                fontSize: isProtocol
                   ? 9.5
                   : 10.5,
               }}>{entry}</div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
